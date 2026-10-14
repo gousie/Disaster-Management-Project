@@ -1,0 +1,103 @@
+package com.klu.config;
+
+import java.util.List;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+
+    private final JwtAuthFilter jwtAuthFilter;
+
+    public SecurityConfig(JwtAuthFilter jwtAuthFilter) {
+        this.jwtAuthFilter = jwtAuthFilter;
+    }
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+
+        http
+            .cors(Customizer.withDefaults())
+            .csrf(csrf -> csrf.disable())
+            .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(auth -> auth
+                // Authentication
+                .requestMatchers("/api/auth/**").permitAll()
+
+                // Public read for disasters, alerts, climate, media list
+                .requestMatchers(HttpMethod.GET, "/api/disasters/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/alerts/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/climate/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/media/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/volunteers/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/resources/**").permitAll()
+
+                // Funds: create order & verify payment are open (user may not be logged in fully)
+                .requestMatchers(HttpMethod.POST, "/api/funds/create-order").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/funds/verify").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/funds/my/**").permitAll()
+
+                // Admin-only funds list
+                .requestMatchers(HttpMethod.GET, "/api/funds").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/funds/**").hasRole("ADMIN")
+
+                // Admin write operations
+                .requestMatchers(HttpMethod.POST, "/api/disasters/**").hasAnyRole("ADMIN", "USER")
+                .requestMatchers(HttpMethod.PUT, "/api/disasters/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.DELETE, "/api/disasters/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/alerts/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/api/alerts/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.DELETE, "/api/alerts/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/media/**").permitAll()
+                .requestMatchers(HttpMethod.DELETE, "/api/media/**").hasRole("ADMIN")
+
+                // Uploaded files
+                .requestMatchers("/uploads/**").permitAll()
+                .requestMatchers("/swagger-ui/**").permitAll()
+                .requestMatchers("/v3/api-docs/**").permitAll()
+                .requestMatchers("/error").permitAll()
+
+                .anyRequest().authenticated()
+            )
+            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+
+        CorsConfiguration configuration = new CorsConfiguration();
+
+        configuration.setAllowedOrigins(List.of(
+            "http://localhost:5173",
+            "http://localhost:5174",
+            "http://127.0.0.1:5173",
+            "http://127.0.0.1:5174"
+        ));
+
+        configuration.setAllowedMethods(List.of(
+            "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"
+        ));
+
+        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setAllowCredentials(true);
+        configuration.setExposedHeaders(List.of("Authorization"));
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
+}

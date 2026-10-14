@@ -1,0 +1,22 @@
+
+# Frontend dependencies and build files
+node_modules/
+dist/
+
+# Environment variables and secrets
+.env
+.env.local
+.env.*.local
+
+# Backend build files
+target/
+build/
+
+# Uploaded files
+uploads/
+
+# IDE and operating system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
