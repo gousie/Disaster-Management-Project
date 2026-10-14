@@ -19,85 +19,101 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    private final JwtAuthFilter jwtAuthFilter;
+private final JwtAuthFilter jwtAuthFilter;
 
-    public SecurityConfig(JwtAuthFilter jwtAuthFilter) {
-        this.jwtAuthFilter = jwtAuthFilter;
-    }
+public SecurityConfig(JwtAuthFilter jwtAuthFilter) {
+    this.jwtAuthFilter = jwtAuthFilter;
+}
 
-    @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+@Bean
+public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
-        http
-            .cors(Customizer.withDefaults())
-            .csrf(csrf -> csrf.disable())
-            .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth
-                // Authentication
-                .requestMatchers("/api/auth/**").permitAll()
+    http
+        .cors(Customizer.withDefaults())
+        .csrf(csrf -> csrf.disable())
+        .sessionManagement(sm ->
+            sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+        )
+        .authorizeHttpRequests(auth -> auth
 
-                // Public read for disasters, alerts, climate, media list
-                .requestMatchers(HttpMethod.GET, "/api/disasters/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/alerts/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/climate/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/media/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/volunteers/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/resources/**").permitAll()
+            // Authentication
+            .requestMatchers("/api/auth/**").permitAll()
 
-                // Funds: create order & verify payment are open (user may not be logged in fully)
-                .requestMatchers(HttpMethod.POST, "/api/funds/create-order").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/funds/verify").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/funds/my/**").permitAll()
+            // Public read operations
+            .requestMatchers(HttpMethod.GET, "/api/disasters/**").permitAll()
+            .requestMatchers(HttpMethod.GET, "/api/alerts/**").permitAll()
+            .requestMatchers(HttpMethod.GET, "/api/climate/**").permitAll()
+            .requestMatchers(HttpMethod.GET, "/api/media/**").permitAll()
+            .requestMatchers(HttpMethod.GET, "/api/volunteers/**").permitAll()
+            .requestMatchers(HttpMethod.GET, "/api/resources/**").permitAll()
 
-                // Admin-only funds list
-                .requestMatchers(HttpMethod.GET, "/api/funds").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.GET, "/api/funds/**").hasRole("ADMIN")
+            // Funds and payments
+            .requestMatchers(HttpMethod.POST, "/api/funds/create-order").permitAll()
+            .requestMatchers(HttpMethod.POST, "/api/funds/verify").permitAll()
+            .requestMatchers(HttpMethod.GET, "/api/funds/my/**").permitAll()
+            .requestMatchers(HttpMethod.GET, "/api/funds").hasRole("ADMIN")
+            .requestMatchers(HttpMethod.GET, "/api/funds/**").hasRole("ADMIN")
 
-                // Admin write operations
-                .requestMatchers(HttpMethod.POST, "/api/disasters/**").hasAnyRole("ADMIN", "USER")
-                .requestMatchers(HttpMethod.PUT, "/api/disasters/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.DELETE, "/api/disasters/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.POST, "/api/alerts/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.PUT, "/api/alerts/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.DELETE, "/api/alerts/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.POST, "/api/media/**").permitAll()
-                .requestMatchers(HttpMethod.DELETE, "/api/media/**").hasRole("ADMIN")
+            // Disaster management
+            .requestMatchers(HttpMethod.POST, "/api/disasters/**")
+                .hasAnyRole("ADMIN", "USER")
+            .requestMatchers(HttpMethod.PUT, "/api/disasters/**").hasRole("ADMIN")
+            .requestMatchers(HttpMethod.DELETE, "/api/disasters/**").hasRole("ADMIN")
 
-                // Uploaded files
-                .requestMatchers("/uploads/**").permitAll()
-                .requestMatchers("/swagger-ui/**").permitAll()
-                .requestMatchers("/v3/api-docs/**").permitAll()
-                .requestMatchers("/error").permitAll()
+            // Alerts
+            .requestMatchers(HttpMethod.POST, "/api/alerts/**").hasRole("ADMIN")
+            .requestMatchers(HttpMethod.PUT, "/api/alerts/**").hasRole("ADMIN")
+            .requestMatchers(HttpMethod.DELETE, "/api/alerts/**").hasRole("ADMIN")
 
-                .anyRequest().authenticated()
-            )
-            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+            // Media
+            .requestMatchers(HttpMethod.POST, "/api/media/**").permitAll()
+            .requestMatchers(HttpMethod.DELETE, "/api/media/**").hasRole("ADMIN")
 
-        return http.build();
-    }
+            // Public static resources and API documentation
+            .requestMatchers("/uploads/**").permitAll()
+            .requestMatchers("/swagger-ui/**", "/swagger-ui.html").permitAll()
+            .requestMatchers("/v3/api-docs/**").permitAll()
+            .requestMatchers("/error").permitAll()
 
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
+            // All other routes require authentication
+            .anyRequest().authenticated()
+        )
+        .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
-        CorsConfiguration configuration = new CorsConfiguration();
+    return http.build();
+}
 
-        configuration.setAllowedOrigins(List.of(
-            "http://localhost:5173",
-            "http://localhost:5174",
-            "http://127.0.0.1:5173",
-            "http://127.0.0.1:5174"
-        ));
+@Bean
+public CorsConfigurationSource corsConfigurationSource() {
 
-        configuration.setAllowedMethods(List.of(
-            "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"
-        ));
+    CorsConfiguration configuration = new CorsConfiguration();
 
-        configuration.setAllowedHeaders(List.of("*"));
-        configuration.setAllowCredentials(true);
-        configuration.setExposedHeaders(List.of("Authorization"));
+    // Include the Vite ports used by the frontend
+    configuration.setAllowedOrigins(List.of(
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://localhost:5176",
+        "http://localhost:5177",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
+        "http://127.0.0.1:5176",
+        "http://127.0.0.1:5177"
+    ));
 
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
-        return source;
-    }
+    configuration.setAllowedMethods(List.of(
+        "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"
+    ));
+
+    configuration.setAllowedHeaders(List.of("*"));
+    configuration.setAllowCredentials(true);
+    configuration.setExposedHeaders(List.of("Authorization"));
+
+    UrlBasedCorsConfigurationSource source =
+        new UrlBasedCorsConfigurationSource();
+
+    source.registerCorsConfiguration("/**", configuration);
+
+    return source;
+}
+
 }
