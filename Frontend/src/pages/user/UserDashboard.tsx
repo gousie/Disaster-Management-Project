@@ -876,7 +876,7 @@ function UserDashboard() {
     };
 
     return (
-        <div className="user-dashboard theme-cyber">
+        <div className="user-dashboard">
             {/* NEWS TICKER */}
             <div className="news-ticker">
                 <button
