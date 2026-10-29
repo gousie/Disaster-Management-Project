@@ -301,7 +301,7 @@ function Login() {
   onChange={(e) => setRole(e.target.value as "USER" | "ADMIN")}
 >
   <option value="USER">Field User</option>
-  <option value="ADMIN">Admin</option>
+  
 </select>
                                 </label>
                                 {error && <div className="auth-error">{error}</div>}
