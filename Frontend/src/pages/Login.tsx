@@ -297,7 +297,7 @@ function Login() {
                                 <label>Account Role
                                     <select id="signup-role" value={role} onChange={(e) => setRole(e.target.value as "USER" | "ADMIN")}>
                                         <option value="USER">Field User</option>
-                                        <option value="ADMIN">Administrator</option>
+                                       
                                     </select>
                                 </label>
                                 {error && <div className="auth-error">{error}</div>}

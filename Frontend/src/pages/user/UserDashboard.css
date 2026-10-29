@@ -6498,3 +6498,563 @@ td {
         grid-template-columns: 1fr;
     }
 }
+
+/* =========================================================
+   USER DASHBOARD — 3 THEME SYSTEM (matches Admin ThemeToggle)
+   Uses html[data-theme="dark|light|violet"] set by ThemeToggle
+   dark   = Sky blue command center (default)
+   light  = Emerald white
+   violet = Violet aurora
+========================================================= */
+
+/* --- Shared CSS variables for user portal --- */
+.user-dashboard {
+    --u-bg-base: #0b1220;
+    --u-bg-sidebar: #0f1b33;
+    --u-bg-card: rgba(30, 41, 59, 0.95);
+    --u-bg-card2: rgba(15, 23, 42, 0.98);
+    --u-border: rgba(96, 165, 250, 0.22);
+    --u-border-hover: rgba(96, 165, 250, 0.4);
+    --u-accent: #2563eb;
+    --u-accent2: #22d3ee;
+    --u-accent-glow: rgba(37, 99, 235, 0.35);
+    --u-text: #f8fafc;
+    --u-text-muted: #94a3b8;
+    --u-text-dim: #64748b;
+    --u-danger: #ef4444;
+    --u-success: #10b981;
+    --u-btn-grad: linear-gradient(135deg, #2563eb, #06b6d4);
+    --u-sidebar-grad: linear-gradient(180deg, #0f1b33 0%, #0b1220 100%);
+    --u-hero-overlay: linear-gradient(120deg, rgba(15, 23, 42, 0.9), rgba(30, 58, 138, 0.55));
+    --u-ticker-grad: linear-gradient(90deg, #1e3a8a, #0e7490, #991b1b);
+    --u-brand-grad: linear-gradient(145deg, #22d3ee, #2563eb);
+    --u-live: #f87171;
+    --u-chip-border: rgba(255, 255, 255, 0.15);
+    color: var(--u-text) !important;
+    flex-direction: column !important;
+    min-height: 100vh;
+    background:
+        radial-gradient(ellipse 80% 50% at 10% 0%, rgba(37, 99, 235, 0.35), transparent 50%),
+        radial-gradient(ellipse 60% 40% at 95% 5%, rgba(239, 68, 68, 0.18), transparent 45%),
+        radial-gradient(ellipse 50% 40% at 50% 100%, rgba(34, 211, 238, 0.12), transparent 50%),
+        linear-gradient(180deg, #0b1220 0%, #111827 45%, #0f172a 100%) !important;
+}
+
+/* Light theme variables */
+html[data-theme="light"] .user-dashboard,
+html.light .user-dashboard {
+    --u-bg-base: #e8f0ec;          /* was #f4faf7 — softer green-gray */
+    --u-bg-sidebar: #f0f5f2;       /* was #ffffff */
+    --u-bg-card: #f5faf7;          /* was #ffffff */
+    --u-bg-card2: #eef6f1;         /* was #f0fdf4 */
+    --u-text: #1e293b;             /* was #0f172a — slightly softer */
+    --u-text-muted: #64748b;
+    /* keep accent greens the same or slightly mute: */
+    --u-accent: #0d9488;           /* slightly less neon than #059669 */
+    --u-accent2: #14b8a6;
+
+    background:
+        radial-gradient(ellipse 80% 50% at 10% 0%, rgba(16, 185, 129, 0.06), transparent 50%),
+        radial-gradient(ellipse 60% 40% at 95% 5%, rgba(52, 211, 153, 0.04), transparent 45%),
+        linear-gradient(180deg, #e8f0ec 0%, #e2ebe6 45%, #e8f0ec 100%) !important;
+}
+
+/* Violet theme variables */
+html[data-theme="violet"] .user-dashboard,
+html.violet .user-dashboard {
+    --u-bg-base: #0c0618;
+    --u-bg-sidebar: #110a22;
+    --u-bg-card: rgba(20, 12, 36, 0.95);
+    --u-bg-card2: rgba(14, 8, 28, 0.98);
+    --u-border: rgba(167, 139, 250, 0.22);
+    --u-border-hover: rgba(167, 139, 250, 0.4);
+    --u-accent: #8b5cf6;
+    --u-accent2: #a78bfa;
+    --u-accent-glow: rgba(139, 92, 246, 0.35);
+    --u-text: #ede9fe;
+    --u-text-muted: #8b7ab8;
+    --u-text-dim: #5b4a7a;
+    --u-danger: #ef4444;
+    --u-success: #10b981;
+    --u-btn-grad: linear-gradient(135deg, #6d28d9, #8b5cf6);
+    --u-sidebar-grad: linear-gradient(180deg, #110a22 0%, #0c0618 100%);
+    --u-hero-overlay: linear-gradient(120deg, rgba(12, 6, 24, 0.92), rgba(76, 29, 149, 0.45));
+    --u-ticker-grad: linear-gradient(90deg, #4c1d95, #7c3aed, #a21caf);
+    --u-brand-grad: linear-gradient(145deg, #a78bfa, #7c3aed);
+    --u-live: #f87171;
+    --u-chip-border: rgba(167, 139, 250, 0.25);
+    background:
+        radial-gradient(ellipse 80% 50% at 10% 0%, rgba(139, 92, 246, 0.28), transparent 50%),
+        radial-gradient(ellipse 60% 40% at 95% 5%, rgba(167, 139, 250, 0.15), transparent 45%),
+        radial-gradient(ellipse 50% 40% at 50% 100%, rgba(109, 40, 217, 0.12), transparent 50%),
+        linear-gradient(180deg, #0c0618 0%, #110a22 45%, #0e0618 100%) !important;
+    color: var(--u-text) !important;
+}
+
+/* Shell */
+.user-dashboard .user-shell {
+    display: flex;
+    flex: 1;
+    width: 100%;
+    min-height: 0;
+}
+
+/* News ticker — theme aware */
+.user-dashboard .news-ticker {
+    background: var(--u-ticker-grad) !important;
+}
+
+/* Sidebar */
+.user-dashboard .user-sidebar {
+    background: var(--u-sidebar-grad) !important;
+    border-right: 1px solid var(--u-border) !important;
+}
+
+.user-dashboard .user-sidebar::before {
+    background: linear-gradient(90deg, transparent, var(--u-accent2), var(--u-accent), transparent) !important;
+}
+
+.user-dashboard .brand-logo,
+.user-dashboard .user-brand .brand-logo {
+    background: var(--u-brand-grad) !important;
+    color: #0b1220 !important;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--u-accent2) 30%, transparent), 0 10px 28px var(--u-accent-glow) !important;
+}
+
+html[data-theme="light"] .user-dashboard .brand-logo,
+html.light .user-dashboard .brand-logo,
+html[data-theme="light"] .user-dashboard .user-brand .brand-logo,
+html.light .user-dashboard .user-brand .brand-logo {
+    color: #fff !important;
+}
+
+/* Nav buttons */
+.user-dashboard .user-nav-btn {
+    color: var(--u-text-muted) !important;
+}
+
+.user-dashboard .user-nav-btn:hover {
+    background: color-mix(in srgb, var(--u-accent) 12%, transparent) !important;
+    color: var(--u-text) !important;
+}
+
+.user-dashboard .user-nav-btn.active {
+    background: linear-gradient(90deg, color-mix(in srgb, var(--u-accent) 30%, transparent), transparent) !important;
+    color: var(--u-accent2) !important;
+    border-left: 3px solid var(--u-accent2) !important;
+}
+
+.user-dashboard .nav-group-title {
+    color: var(--u-text-dim) !important;
+}
+
+.user-dashboard .nav-badge {
+    background: color-mix(in srgb, var(--u-accent) 20%, transparent) !important;
+    color: var(--u-accent2) !important;
+}
+
+/* Header / Hero */
+.user-dashboard .user-header,
+.user-dashboard .ndma-hero {
+    background: var(--u-hero-overlay),
+        url("https://images.unsplash.com/photo-1504608524841-42fe6f032b4b?auto=format&fit=crop&w=1600&q=70") center/cover !important;
+    border: 1px solid var(--u-border) !important;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25) !important;
+}
+
+html[data-theme="light"] .user-dashboard .user-header,
+html.light .user-dashboard .user-header,
+html[data-theme="light"] .user-dashboard .ndma-hero,
+html.light .user-dashboard .ndma-hero {
+    background: var(--u-hero-overlay),
+        linear-gradient(135deg, #ecfdf5 0%, #d1fae5 50%, #f0fdf4 100%) !important;
+    box-shadow: 0 12px 40px rgba(16, 185, 129, 0.1) !important;
+}
+
+html[data-theme="violet"] .user-dashboard .user-header,
+html.violet .user-dashboard .user-header,
+html[data-theme="violet"] .user-dashboard .ndma-hero,
+html.violet .user-dashboard .ndma-hero {
+    background: var(--u-hero-overlay),
+        url("https://images.unsplash.com/photo-1504608524841-42fe6f032b4b?auto=format&fit=crop&w=1600&q=70") center/cover !important;
+}
+
+.user-dashboard .user-header h1,
+.user-dashboard .ndma-hero-text h1 {
+    color: var(--u-text) !important;
+}
+
+.user-dashboard .user-header p,
+.user-dashboard .ndma-hero-text p {
+    color: var(--u-text-muted) !important;
+}
+
+.user-dashboard .system-status {
+    color: var(--u-accent2) !important;
+    background: color-mix(in srgb, var(--u-accent2) 15%, transparent) !important;
+    border: 1px solid color-mix(in srgb, var(--u-accent2) 40%, transparent) !important;
+}
+
+/* Stat chips */
+.user-dashboard .user-stat-chip {
+    border: 1px solid var(--u-chip-border) !important;
+    background: color-mix(in srgb, var(--u-accent) 12%, transparent) !important;
+}
+
+.user-dashboard .user-stat-chip strong {
+    color: var(--u-accent2) !important;
+}
+
+.user-dashboard .chip-red {
+    background: rgba(239, 68, 68, 0.15) !important;
+    border-color: rgba(248, 113, 113, 0.4) !important;
+}
+.user-dashboard .chip-red strong { color: #f87171 !important; }
+
+.user-dashboard .chip-cyan {
+    background: color-mix(in srgb, var(--u-accent2) 15%, transparent) !important;
+    border-color: color-mix(in srgb, var(--u-accent2) 40%, transparent) !important;
+}
+.user-dashboard .chip-cyan strong { color: var(--u-accent2) !important; }
+
+.user-dashboard .chip-blue {
+    background: color-mix(in srgb, var(--u-accent) 15%, transparent) !important;
+    border-color: color-mix(in srgb, var(--u-accent) 40%, transparent) !important;
+}
+.user-dashboard .chip-blue strong { color: var(--u-accent2) !important; }
+
+/* Section titles */
+.user-dashboard .section-title h2 {
+    color: var(--u-text) !important;
+}
+.user-dashboard .section-title p {
+    color: var(--u-text-muted) !important;
+}
+
+.user-dashboard .live-badge {
+    background: rgba(239, 68, 68, 0.15) !important;
+    border: 1px solid rgba(248, 113, 113, 0.4) !important;
+    color: var(--u-live) !important;
+}
+
+/* Cards: disasters, report, support, climate */
+.user-dashboard .user-disaster-card,
+.user-dashboard .user-report-form,
+.user-dashboard .support-chat,
+.user-dashboard .severity-chart-card,
+.user-dashboard .report-form-card {
+    background: linear-gradient(165deg, var(--u-bg-card), var(--u-bg-card2)) !important;
+    border: 1px solid var(--u-border) !important;
+    color: var(--u-text) !important;
+}
+
+html[data-theme="light"] .user-dashboard .user-disaster-card,
+html.light .user-dashboard .user-disaster-card,
+html[data-theme="light"] .user-dashboard .user-report-form,
+html.light .user-dashboard .user-report-form,
+html[data-theme="light"] .user-dashboard .support-chat,
+html.light .user-dashboard .support-chat,
+html[data-theme="light"] .user-dashboard .severity-chart-card,
+html.light .user-dashboard .severity-chart-card {
+    background: #f5faf7 !important;
+    box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06) !important;
+}
+
+.user-dashboard .user-disaster-card:hover {
+    border-color: var(--u-border-hover) !important;
+    box-shadow: 0 16px 40px var(--u-accent-glow) !important;
+}
+
+.user-dashboard .user-disaster-content h3 {
+    color: var(--u-text) !important;
+}
+.user-dashboard .disaster-description {
+    color: var(--u-text-muted) !important;
+}
+.user-dashboard .disaster-location,
+.user-dashboard .disaster-type-tag {
+    color: var(--u-accent2) !important;
+}
+
+/* Climate cards */
+.user-dashboard .user-climate-card {
+    background: linear-gradient(160deg, var(--u-bg-card), var(--u-bg-card2)) !important;
+    border: 1px solid var(--u-border) !important;
+}
+.user-dashboard .user-climate-card strong {
+    color: var(--u-text) !important;
+}
+.user-dashboard .user-climate-card small {
+    color: var(--u-accent2) !important;
+}
+
+html[data-theme="light"] .user-dashboard .user-climate-card,
+html.light .user-dashboard .user-climate-card {
+    background: #ffffff !important;
+}
+
+/* Forms */
+.user-dashboard .form-group label {
+    color: var(--u-accent2) !important;
+}
+.user-dashboard .form-group input,
+.user-dashboard .form-group select,
+.user-dashboard .form-group textarea,
+.user-dashboard .location-select {
+    background: color-mix(in srgb, var(--u-bg-base) 85%, #000) !important;
+    border: 1px solid var(--u-border) !important;
+    color: var(--u-text) !important;
+}
+
+html[data-theme="light"] .user-dashboard .form-group input,
+html.light .user-dashboard .form-group input,
+html[data-theme="light"] .user-dashboard .form-group select,
+html.light .user-dashboard .form-group select,
+html[data-theme="light"] .user-dashboard .form-group textarea,
+html.light .user-dashboard .form-group textarea,
+html[data-theme="light"] .user-dashboard .location-select,
+html.light .user-dashboard .location-select {
+    background: #ffffff !important;
+    border-color: rgba(5, 150, 105, 0.22) !important;
+    color: #0f172a !important;
+}
+
+.user-dashboard .form-group input:focus,
+.user-dashboard .form-group select:focus,
+.user-dashboard .form-group textarea:focus {
+    border-color: var(--u-accent2) !important;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--u-accent2) 25%, transparent) !important;
+}
+
+/* Primary buttons */
+.user-dashboard .report-submit-btn,
+.user-dashboard .primary-button,
+.user-dashboard .ndma-btn.primary {
+    background: var(--u-btn-grad) !important;
+    color: #fff !important;
+    box-shadow: 0 8px 28px var(--u-accent-glow) !important;
+    border: none !important;
+}
+
+html[data-theme="light"] .user-dashboard .report-submit-btn,
+html.light .user-dashboard .report-submit-btn,
+html[data-theme="light"] .user-dashboard .primary-button,
+html.light .user-dashboard .primary-button {
+    color: #fff !important;
+}
+
+/* Sidebar footer / profile */
+.user-dashboard .user-sidebar-footer,
+.user-dashboard .user-profile-card {
+    border-top-color: var(--u-border) !important;
+}
+.user-dashboard .user-name {
+    color: var(--u-text) !important;
+}
+.user-dashboard .user-role-tag {
+    color: var(--u-text-muted) !important;
+}
+.user-dashboard .user-logout-btn {
+    color: var(--u-text-muted) !important;
+    border-color: var(--u-border) !important;
+}
+.user-dashboard .user-logout-btn:hover {
+    color: #f87171 !important;
+    border-color: rgba(239, 68, 68, 0.35) !important;
+    background: rgba(239, 68, 68, 0.08) !important;
+}
+
+/* Search */
+.user-dashboard .sidebar-search-input {
+    background: color-mix(in srgb, var(--u-bg-base) 80%, transparent) !important;
+    border-color: var(--u-border) !important;
+    color: var(--u-text) !important;
+}
+html[data-theme="light"] .user-dashboard .sidebar-search-input,
+html.light .user-dashboard .sidebar-search-input {
+    background: #f8fffc !important;
+    color: #0f172a !important;
+}
+
+/* SOS button */
+.user-dashboard .sidebar-sos-beacon {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(220, 38, 38, 0.1)) !important;
+    border: 1px solid rgba(239, 68, 68, 0.35) !important;
+}
+
+/* Map, empty states */
+.user-dashboard .user-map-wrap,
+.user-dashboard .disaster-map-container {
+    border: 1px solid var(--u-border) !important;
+}
+.user-dashboard .empty-state {
+    background: color-mix(in srgb, var(--u-bg-card) 80%, transparent) !important;
+    border-color: var(--u-border) !important;
+    color: var(--u-text-muted) !important;
+}
+.user-dashboard .empty-state h3 {
+    color: var(--u-text) !important;
+}
+
+/* NDMA content cards */
+.user-dashboard .whats-new-card,
+.user-dashboard .dos-card,
+.user-dashboard .donts-card,
+.user-dashboard .helpline-card,
+.user-dashboard .ndma-resource-card,
+.user-dashboard .ndma-dm-card,
+.user-dashboard .ndma-social-card,
+.user-dashboard .ndma-site-card,
+.user-dashboard .video-card {
+    background: var(--u-bg-card) !important;
+    border-color: var(--u-border) !important;
+}
+
+html[data-theme="light"] .user-dashboard .whats-new-card,
+html.light .user-dashboard .whats-new-card,
+html[data-theme="light"] .user-dashboard .dos-card,
+html.light .user-dashboard .dos-card,
+html[data-theme="light"] .user-dashboard .donts-card,
+html.light .user-dashboard .donts-card,
+html[data-theme="light"] .user-dashboard .helpline-card,
+html.light .user-dashboard .helpline-card,
+html[data-theme="light"] .user-dashboard .ndma-resource-card,
+html.light .user-dashboard .ndma-resource-card,
+html[data-theme="light"] .user-dashboard .ndma-dm-card,
+html.light .user-dashboard .ndma-dm-card,
+html[data-theme="light"] .user-dashboard .ndma-social-card,
+html.light .user-dashboard .ndma-social-card,
+html[data-theme="light"] .user-dashboard .ndma-site-card,
+html.light .user-dashboard .ndma-site-card,
+html[data-theme="light"] .user-dashboard .video-card,
+html.light .user-dashboard .video-card {
+    background: #ffffff !important;
+}
+
+.user-dashboard .whats-new-card h3,
+.user-dashboard .ndma-resource-body h3,
+.user-dashboard .ndma-dm-card h3,
+.user-dashboard .ndma-social-card strong,
+.user-dashboard .ndma-site-card strong,
+.user-dashboard .video-meta h3,
+.user-dashboard .helpline-card strong {
+    color: var(--u-text) !important;
+}
+
+.user-dashboard .whats-new-card p,
+.user-dashboard .ndma-resource-body p,
+.user-dashboard .ndma-site-card span,
+.user-dashboard .video-meta p {
+    color: var(--u-text-muted) !important;
+}
+
+.user-dashboard .guidelines-table th {
+    background: color-mix(in srgb, var(--u-accent) 15%, var(--u-bg-card)) !important;
+    color: var(--u-accent2) !important;
+}
+.user-dashboard .guidelines-table td {
+    color: var(--u-text) !important;
+    border-bottom-color: var(--u-border) !important;
+}
+
+/* AI panel */
+.user-dashboard .ai-panel,
+.user-dashboard .ai-floating {
+    background: linear-gradient(165deg, var(--u-bg-card2), var(--u-bg-base)) !important;
+    border-color: var(--u-border) !important;
+}
+.user-dashboard .ai-header {
+    background: color-mix(in srgb, var(--u-accent) 12%, transparent) !important;
+    border-bottom-color: var(--u-border) !important;
+}
+.user-dashboard .ai-msg.user .ai-bubble {
+    background: var(--u-btn-grad) !important;
+}
+.user-dashboard .ai-fab {
+    background: var(--u-btn-grad) !important;
+    box-shadow: 0 10px 32px var(--u-accent-glow) !important;
+}
+
+/* Footer */
+.user-dashboard .user-footer {
+    color: var(--u-text-dim) !important;
+    border-top: 1px solid var(--u-border);
+}
+
+/* Modals */
+.user-dashboard .disastra-modal-dialog,
+.user-dashboard .detail-modal {
+    background: var(--u-bg-card2) !important;
+    border: 1px solid var(--u-border) !important;
+    color: var(--u-text) !important;
+}
+
+html[data-theme="light"] .user-dashboard .disastra-modal-dialog,
+html.light .user-dashboard .disastra-modal-dialog,
+html[data-theme="light"] .user-dashboard .detail-modal,
+html.light .user-dashboard .detail-modal {
+    background: #ffffff !important;
+}
+
+/* Theme toggle button in user portal */
+.user-dashboard .theme-toggle-btn,
+.user-dashboard .footer-theme-btn {
+    border-color: var(--u-border) !important;
+    color: var(--u-text-muted) !important;
+    background: color-mix(in srgb, var(--u-accent) 8%, transparent) !important;
+}
+.user-dashboard .theme-toggle-btn:hover,
+.user-dashboard .footer-theme-btn:hover {
+    border-color: var(--u-border-hover) !important;
+    color: var(--u-accent2) !important;
+}
+
+/* Chat bubbles */
+.user-dashboard .chat-bubble.user {
+    background: color-mix(in srgb, var(--u-accent) 20%, transparent) !important;
+}
+.user-dashboard .chat-bubble.admin {
+    background: color-mix(in srgb, var(--u-bg-card) 90%, #000) !important;
+}
+
+/* Hazard tabs */
+.user-dashboard .hazard-tabs button {
+    border-color: var(--u-border) !important;
+    background: var(--u-bg-card) !important;
+    color: var(--u-text-muted) !important;
+}
+.user-dashboard .hazard-tabs button.active {
+    background: var(--u-btn-grad) !important;
+    color: #fff !important;
+    border-color: transparent !important;
+}
+
+/* Ensure light theme text is dark enough on hero */
+html[data-theme="light"] .user-dashboard .ndma-hero-text h1,
+html.light .user-dashboard .ndma-hero-text h1 {
+    color: #064e3b !important;
+}
+html[data-theme="light"] .user-dashboard .ndma-hero-text p,
+html.light .user-dashboard .ndma-hero-text p {
+    color: #065f46 !important;
+}
+html[data-theme="light"] .user-dashboard .system-status,
+html.light .user-dashboard .system-status {
+    color: #047857 !important;
+    background: rgba(16, 185, 129, 0.12) !important;
+    border-color: rgba(16, 185, 129, 0.3) !important;
+}
+
+/* Violet-specific nav active glow */
+html[data-theme="violet"] .user-dashboard .user-nav-btn.active,
+html.violet .user-dashboard .user-nav-btn.active {
+    box-shadow: inset 0 0 20px rgba(139, 92, 246, 0.12);
+}
+
+/* Override old theme-cyber / theme-emerald specificity so data-theme wins */
+html[data-theme="light"] .theme-cyber.user-dashboard,
+html.light .theme-cyber.user-dashboard,
+html[data-theme="violet"] .theme-cyber.user-dashboard,
+html.violet .theme-cyber.user-dashboard {
+    /* variables above already applied via .user-dashboard */
+}
