@@ -42,6 +42,9 @@ public class SecurityConfig {
 
             .authorizeHttpRequests(auth -> auth
 
+                // Allow CORS preflight requests
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
                 // Authentication
                 .requestMatchers("/api/auth/**").permitAll()
 
@@ -102,8 +105,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
 
-        CorsConfiguration configuration =
-            new CorsConfiguration();
+        CorsConfiguration configuration = new CorsConfiguration();
 
         // Allowed frontend origins
         configuration.setAllowedOrigins(List.of(
@@ -115,7 +117,8 @@ public class SecurityConfig {
             "http://127.0.0.1:5174",
             "http://127.0.0.1:5176",
             "http://127.0.0.1:5177",
-            "https://disaster-management-project-seven.vercel.app"
+            "https://disaster-management-project-seven.vercel.app",
+            "https://disaster-management-project-lime.vercel.app"
         ));
 
         // Allowed HTTP methods
