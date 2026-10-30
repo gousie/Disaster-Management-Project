@@ -1,10 +1,10 @@
-/** Extra post details + gallery images */
-
+/** Extra post details + gallery images + videos */
 import { broadcastLive } from "./liveSync";
 
 export interface DisasterExtras {
     extraDetails: string;
     gallery: string[];
+    videos: string[];
 }
 
 const KEY = "disastra_disaster_extras_v1";
@@ -38,23 +38,36 @@ function keyOf(id: number | string | undefined | null): string {
     return String(id).trim();
 }
 
+function normalize(raw: any): DisasterExtras {
+    return {
+        extraDetails: (raw?.extraDetails || "").trim(),
+        gallery: Array.isArray(raw?.gallery)
+            ? raw.gallery.filter((u: any) => u && String(u).trim())
+            : [],
+        videos: Array.isArray(raw?.videos)
+            ? raw.videos.filter((u: any) => u && String(u).trim())
+            : [],
+    };
+}
+
 export function getExtras(id: number | string | undefined | null): DisasterExtras {
     const k = keyOf(id);
-    if (!k) return { extraDetails: "", gallery: [] };
+    if (!k) return { extraDetails: "", gallery: [], videos: [] };
     const map = load();
-    return map[k] || { extraDetails: "", gallery: [] };
+    return normalize(map[k] || {});
 }
 
 export function setExtras(
     id: number | string | undefined | null,
-    extras: DisasterExtras,
+    extras: Partial<DisasterExtras>,
     title?: string
 ) {
     const map = load();
-    const payload: DisasterExtras = {
-        extraDetails: (extras.extraDetails || "").trim(),
-        gallery: (extras.gallery || []).filter((u) => u && String(u).trim()),
-    };
+    const payload = normalize({
+        extraDetails: extras.extraDetails,
+        gallery: extras.gallery,
+        videos: extras.videos,
+    });
     const k = keyOf(id);
     if (k) map[k] = payload;
     if (title && title.trim()) {
