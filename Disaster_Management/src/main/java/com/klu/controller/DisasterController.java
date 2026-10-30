@@ -2,10 +2,10 @@ package com.klu.controller;
 
 import com.klu.entity.Disaster;
 import com.klu.repository.DisasterRepository;
-
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @RestController
@@ -36,8 +36,15 @@ public class DisasterController {
         return repo.findByStatus(status);
     }
 
+    /** Create — JSON body is bound to Disaster (including extraDetails, gallery, videos). */
     @PostMapping
     public Disaster create(@RequestBody Disaster disaster) {
+        if (disaster.getGallery() == null) {
+            disaster.setGallery(new ArrayList<>());
+        }
+        if (disaster.getVideos() == null) {
+            disaster.setVideos(new ArrayList<>());
+        }
         return repo.save(disaster);
     }
 
@@ -47,7 +54,6 @@ public class DisasterController {
             @RequestBody Disaster data) {
 
         Disaster d = repo.findById(id).orElse(null);
-
         if (d == null) {
             return ResponseEntity.notFound().build();
         }
@@ -60,23 +66,30 @@ public class DisasterController {
         d.setLatitude(data.getLatitude());
         d.setLongitude(data.getLongitude());
         d.setStatus(data.getStatus());
+
         // Persist image so User & Admin always match
         if (data.getImageUrl() != null) {
             d.setImageUrl(data.getImageUrl());
         }
+
+        // Extra details + gallery + videos (cross-device)
+        d.setExtraDetails(data.getExtraDetails());
+        d.setGallery(
+                data.getGallery() != null ? data.getGallery() : new ArrayList<>()
+        );
+        d.setVideos(
+                data.getVideos() != null ? data.getVideos() : new ArrayList<>()
+        );
 
         return ResponseEntity.ok(repo.save(d));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> delete(@PathVariable Long id) {
-
         if (!repo.existsById(id)) {
             return ResponseEntity.notFound().build();
         }
-
         repo.deleteById(id);
-
         return ResponseEntity.ok("Disaster deleted successfully");
     }
 }
