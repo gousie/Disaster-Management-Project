@@ -89,7 +89,7 @@ public class SecurityConfig {
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/v3/api-docs/**").permitAll()
                 .requestMatchers("/error").permitAll()
-
+                .requestMatchers(HttpMethod.GET, "/api/users/**").hasRole("ADMIN")
                 // All other routes require authentication
                 .anyRequest().authenticated()
             )
