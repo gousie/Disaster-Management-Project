@@ -494,6 +494,8 @@ function DisasterDetailModal({
                     border-radius: 12px;
                     background: rgba(16,185,129,0.1);
                     border: 1px solid rgba(52,211,153,0.3);
+                    display: block !important;
+                    visibility: visible !important;
                 }
                 .detail-extra-label {
                     display: block;
@@ -543,6 +545,8 @@ function DisasterDetailModal({
                 }
                 .detail-videos {
                     margin: 16px 0 8px;
+                    display: block !important;
+                    visibility: visible !important;
                 }
                 .detail-videos-list {
                     display: flex;
@@ -598,17 +602,22 @@ function DisasterDetailModal({
                     .detail-modal-backdrop {
                         padding: 0;
                         align-items: stretch;
+                        overflow: hidden;
                     }
                     .detail-modal {
                         width: 100%;
                         max-height: 100%;
                         height: 100%;
+                        height: 100dvh;
                         border-radius: 0;
                         border: none;
+                        overflow: hidden;
+                        display: flex;
+                        flex-direction: column;
                     }
                     .detail-hero {
-                        max-height: 36vh !important;
-                        min-height: 160px !important;
+                        max-height: 32vh !important;
+                        min-height: 140px !important;
                     }
                     .detail-nav-btn {
                         width: 36px;
@@ -616,10 +625,22 @@ function DisasterDetailModal({
                         font-size: 20px;
                     }
                     .detail-modal-body {
-                        padding: 14px 14px 24px;
+                        flex: 1 1 auto;
+                        min-height: 0;
+                        overflow-y: auto;
+                        -webkit-overflow-scrolling: touch;
+                        padding: 14px 14px calc(28px + env(safe-area-inset-bottom, 0px));
+                    }
+                    .detail-extra-box,
+                    .detail-videos {
+                        display: block !important;
+                        visibility: visible !important;
+                        opacity: 1 !important;
                     }
                     .detail-video-player {
-                        max-height: 200px;
+                        max-height: none;
+                        min-height: 180px;
+                        width: 100%;
                     }
                     .detail-thumb img {
                         width: 56px;
@@ -1082,10 +1103,23 @@ function UserDashboard() {
         document.addEventListener("visibilitychange", onVisibility);
 
         const newsTimer = setInterval(loadLiveNews, 120000);
+        const onFocusOrStorage = () => {
+            setVideos(getVideos());
+            setWhatsNew(getWhatsNew());
+            setGuidelinesList(getGuidelines());
+            setDosDontsList(getDosDonts());
+            setHelplinesList(getHelplines());
+            loadDisasters();
+            loadAlerts();
+        };
+        window.addEventListener("focus", onFocusOrStorage);
+        window.addEventListener("storage", onFocusOrStorage);
         return () => {
             if (timer) clearInterval(timer);
             clearInterval(newsTimer);
             document.removeEventListener("visibilitychange", onVisibility);
+            window.removeEventListener("focus", onFocusOrStorage);
+            window.removeEventListener("storage", onFocusOrStorage);
             unsub();
             unsubImg();
             unsubContent();
@@ -2231,13 +2265,32 @@ function UserDashboard() {
                                     )}
                                     {videos.map((v) => (
                                         <article key={v.id} className="video-card">
-                                            <div className="video-embed">
+                                            <div
+                                                className="video-embed"
+                                                style={{
+                                                    position: "relative",
+                                                    width: "100%",
+                                                    height: 0,
+                                                    paddingTop: "56.25%",
+                                                    background: "#0a1628",
+                                                    overflow: "hidden",
+                                                }}
+                                            >
                                                 <iframe
                                                     src={`https://www.youtube.com/embed/${v.youtubeId}`}
                                                     title={v.title}
                                                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                                     allowFullScreen
                                                     loading="lazy"
+                                                    style={{
+                                                        position: "absolute",
+                                                        top: 0,
+                                                        left: 0,
+                                                        width: "100%",
+                                                        height: "100%",
+                                                        border: 0,
+                                                        display: "block",
+                                                    }}
                                                 />
                                             </div>
                                             <div className="video-meta">
