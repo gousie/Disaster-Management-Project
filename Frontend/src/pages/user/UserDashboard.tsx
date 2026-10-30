@@ -466,6 +466,41 @@ function UserDashboard() {
     const [showNotifPanel, setShowNotifPanel] = useState(false);
     const notifPanelRef = useRef<HTMLDivElement>(null);
 
+    /* ===== REALTIME FEATURES STATE ===== */
+    const [isOnline, setIsOnline] = useState(
+        typeof navigator !== "undefined" ? navigator.onLine : true
+    );
+    const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
+    const [syncPulse, setSyncPulse] = useState(false);
+    const [soundEnabled, setSoundEnabled] = useState(() => {
+        try {
+            return localStorage.getItem("disastra_sound") !== "off";
+        } catch {
+            return true;
+        }
+    });
+    const [browserNotifEnabled, setBrowserNotifEnabled] = useState(() => {
+        try {
+            return localStorage.getItem("disastra_browser_notif") === "on";
+        } catch {
+            return false;
+        }
+    });
+    const [liveToasts, setLiveToasts] = useState<
+        { id: string; title: string; message: string; severity: string }[]
+    >([]);
+    const [dismissedBannerIds, setDismissedBannerIds] = useState<Set<string>>(
+        () => new Set()
+    );
+    const [newDisasterIds, setNewDisasterIds] = useState<Set<string>>(
+        () => new Set()
+    );
+    const knownAlertIdsRef = useRef<Set<string>>(new Set());
+    const knownDisasterIdsRef = useRef<Set<string>>(new Set());
+    const alertsBootstrappedRef = useRef(false);
+    const disastersBootstrappedRef = useRef(false);
+    const tabVisibleRef = useRef(true);
+
     const activeAlerts = useMemo(
         () => alerts.filter((a) => a.active !== false),
         [alerts]
@@ -477,12 +512,102 @@ function UserDashboard() {
     );
     const unreadCount = unreadAlerts.length;
 
+    const criticalBannerAlerts = useMemo(
+        () =>
+            activeAlerts.filter((a) => {
+                const sev = (a.severity || "").toUpperCase();
+                return (
+                    (sev === "CRITICAL" || sev === "HIGH") &&
+                    !dismissedBannerIds.has(alertKey(a))
+                );
+            }),
+        [activeAlerts, dismissedBannerIds]
+    );
+
+    const playAlertSound = (severity?: string) => {
+        if (!soundEnabled) return;
+        try {
+            const Ctx =
+                window.AudioContext ||
+                (window as unknown as { webkitAudioContext: typeof AudioContext })
+                    .webkitAudioContext;
+            if (!Ctx) return;
+            const ctx = new Ctx();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            const sev = (severity || "MEDIUM").toUpperCase();
+            osc.frequency.value = sev === "CRITICAL" ? 880 : sev === "HIGH" ? 660 : 520;
+            gain.gain.value = 0.08;
+            osc.start();
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+            osc.stop(ctx.currentTime + 0.4);
+            setTimeout(() => ctx.close().catch(() => {}), 500);
+        } catch {
+            /* audio blocked */
+        }
+    };
+
+    const pushBrowserNotification = (title: string, body: string) => {
+        if (!browserNotifEnabled) return;
+        if (typeof Notification === "undefined") return;
+        if (Notification.permission !== "granted") return;
+        if (tabVisibleRef.current) return; // only when tab in background
+        try {
+            new Notification(title || "DISASTRA Alert", {
+                body: body || "New emergency update",
+                icon: "/favicon.ico",
+                tag: "disastra-alert",
+            });
+        } catch {
+            /* */
+        }
+    };
+
+    const showLiveToast = (
+        title: string,
+        message: string,
+        severity: string
+    ) => {
+        const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        setLiveToasts((prev) => [
+            ...prev.slice(-4),
+            { id, title, message, severity: (severity || "MEDIUM").toUpperCase() },
+        ]);
+        setTimeout(() => {
+            setLiveToasts((prev) => prev.filter((t) => t.id !== id));
+        }, 7000);
+    };
+
+    const markSynced = () => {
+        setLastSyncedAt(new Date());
+        setSyncPulse(true);
+        setTimeout(() => setSyncPulse(false), 600);
+    };
+
     const loadAlerts = async () => {
         try {
             const response = await api.get("/alerts");
-            const data = (response.data as AlertMessage[]) || [];
-            setAlerts(Array.isArray(data) ? data : []);
+            const data = (Array.isArray(response.data) ? response.data : []) as AlertMessage[];
+            const next = data.filter((a) => a && a.active !== false);
+
+            if (alertsBootstrappedRef.current) {
+                const fresh = next.filter(
+                    (a) => !knownAlertIdsRef.current.has(alertKey(a))
+                );
+                for (const a of fresh) {
+                    showLiveToast(a.title, a.message, a.severity || "HIGH");
+                    playAlertSound(a.severity);
+                    pushBrowserNotification(a.title, a.message);
+                }
+            } else {
+                alertsBootstrappedRef.current = true;
+            }
+            knownAlertIdsRef.current = new Set(next.map((a) => alertKey(a)));
+            setAlerts(data);
             setReadAlertIds(getReadAlertIds());
+            markSynced();
         } catch (err) {
             console.error("Unable to load alerts", err);
         }
@@ -498,6 +623,44 @@ function UserDashboard() {
         }
     };
 
+    const requestBrowserNotifications = async () => {
+        if (typeof Notification === "undefined") {
+            showLiveToast(
+                "Not supported",
+                "This browser does not support desktop notifications.",
+                "MEDIUM"
+            );
+            return;
+        }
+        try {
+            const perm = await Notification.requestPermission();
+            const on = perm === "granted";
+            setBrowserNotifEnabled(on);
+            localStorage.setItem("disastra_browser_notif", on ? "on" : "off");
+            if (on) {
+                showLiveToast(
+                    "Desktop alerts on",
+                    "You will get notifications when the tab is in the background.",
+                    "LOW"
+                );
+            }
+        } catch {
+            /* */
+        }
+    };
+
+    const toggleSound = () => {
+        setSoundEnabled((prev) => {
+            const next = !prev;
+            try {
+                localStorage.setItem("disastra_sound", next ? "on" : "off");
+            } catch {
+                /* */
+            }
+            return next;
+        });
+    };
+
     const loadDisasters = async () => {
         try {
             const response = await api.get("/disasters");
@@ -507,7 +670,51 @@ function UserDashboard() {
                 imageUrl: d.imageUrl ? absoluteMediaUrl(d.imageUrl) : d.imageUrl,
             }));
             // merge admin image overrides so user always sees latest image
-            setDisasters(mergeImageOverrides(data));
+            const merged = mergeImageOverrides(data);
+
+            const activeIds = merged
+                .filter((d) => (d.status || "").toUpperCase() === "ACTIVE")
+                .map((d) => String(d.id ?? d.title));
+
+            if (disastersBootstrappedRef.current) {
+                const brandNew = activeIds.filter(
+                    (id) => !knownDisasterIdsRef.current.has(id)
+                );
+                if (brandNew.length > 0) {
+                    setNewDisasterIds((prev) => {
+                        const n = new Set(prev);
+                        brandNew.forEach((id) => n.add(id));
+                        return n;
+                    });
+                    const first = merged.find(
+                        (d) =>
+                            brandNew.includes(String(d.id ?? d.title)) &&
+                            (d.status || "").toUpperCase() === "ACTIVE"
+                    );
+                    if (first) {
+                        showLiveToast(
+                            "New incident live",
+                            `${first.title} — ${first.location || first.type}`,
+                            first.severity || "HIGH"
+                        );
+                        playAlertSound(first.severity);
+                    }
+                    // clear "NEW" badge after a while
+                    setTimeout(() => {
+                        setNewDisasterIds((prev) => {
+                            const n = new Set(prev);
+                            brandNew.forEach((id) => n.delete(id));
+                            return n;
+                        });
+                    }, 45000);
+                }
+            } else {
+                disastersBootstrappedRef.current = true;
+            }
+            knownDisasterIdsRef.current = new Set(activeIds);
+
+            setDisasters(merged);
+            markSynced();
         } catch (err) {
             console.error("Unable to load disasters", err);
         } finally {
@@ -644,18 +851,64 @@ function UserDashboard() {
             setHelplinesList(getHelplines());
         };
         const unsubContent = subscribeContent(refreshContent);
-        const timer = setInterval(() => {
-            loadDisasters();
-            refreshChat();
-            loadAlerts();
-        }, 5000);
+
+        // Adaptive polling: faster when tab visible, slower when hidden
+        let timer: ReturnType<typeof setInterval> | null = null;
+        const startPoll = () => {
+            if (timer) clearInterval(timer);
+            const ms = tabVisibleRef.current ? 4000 : 20000;
+            timer = setInterval(() => {
+                if (!navigator.onLine) return;
+                loadDisasters();
+                refreshChat();
+                loadAlerts();
+            }, ms);
+        };
+        startPoll();
+
+        const onVisibility = () => {
+            tabVisibleRef.current = document.visibilityState === "visible";
+            if (tabVisibleRef.current && navigator.onLine) {
+                loadDisasters();
+                loadAlerts();
+                refreshChat();
+            }
+            startPoll();
+        };
+        document.addEventListener("visibilitychange", onVisibility);
+
         const newsTimer = setInterval(loadLiveNews, 120000);
         return () => {
-            clearInterval(timer);
+            if (timer) clearInterval(timer);
             clearInterval(newsTimer);
+            document.removeEventListener("visibilitychange", onVisibility);
             unsub();
             unsubImg();
             unsubContent();
+        };
+    }, []);
+
+    // Online / offline status
+    useEffect(() => {
+        const goOnline = () => {
+            setIsOnline(true);
+            loadDisasters();
+            loadAlerts();
+            showLiveToast("Back online", "Syncing latest incidents and alerts…", "LOW");
+        };
+        const goOffline = () => {
+            setIsOnline(false);
+            showLiveToast(
+                "You are offline",
+                "Live updates paused until connection returns.",
+                "HIGH"
+            );
+        };
+        window.addEventListener("online", goOnline);
+        window.addEventListener("offline", goOffline);
+        return () => {
+            window.removeEventListener("online", goOnline);
+            window.removeEventListener("offline", goOffline);
         };
     }, []);
 
@@ -1010,6 +1263,246 @@ function UserDashboard() {
                         ))}
                     </div>
                 </div>
+                {/* Live sync chip on ticker */}
+                <div
+                    style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        paddingRight: 10,
+                        flexShrink: 0,
+                    }}
+                >
+                    <button
+                        type="button"
+                        title={soundEnabled ? "Mute alert sounds" : "Enable alert sounds"}
+                        onClick={toggleSound}
+                        style={{
+                            border: "none",
+                            background: "rgba(255,255,255,0.08)",
+                            color: "#e2e8f0",
+                            borderRadius: 8,
+                            width: 32,
+                            height: 28,
+                            cursor: "pointer",
+                            fontSize: 13,
+                        }}
+                    >
+                        {soundEnabled ? "🔔" : "🔕"}
+                    </button>
+                    <button
+                        type="button"
+                        title="Refresh now"
+                        onClick={() => {
+                            loadDisasters();
+                            loadAlerts();
+                            refreshChat();
+                            loadLiveNews();
+                        }}
+                        style={{
+                            border: "none",
+                            background: syncPulse
+                                ? "rgba(52,211,153,0.35)"
+                                : "rgba(255,255,255,0.08)",
+                            color: "#e2e8f0",
+                            borderRadius: 8,
+                            padding: "4px 10px",
+                            cursor: "pointer",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            whiteSpace: "nowrap",
+                        }}
+                    >
+                        {lastSyncedAt
+                            ? `Synced ${lastSyncedAt.toLocaleTimeString("en-IN", {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                  second: "2-digit",
+                              })}`
+                            : "Sync…"}
+                    </button>
+                </div>
+            </div>
+
+            {/* OFFLINE BANNER */}
+            {!isOnline && (
+                <div
+                    style={{
+                        background: "linear-gradient(90deg,#7f1d1d,#991b1b)",
+                        color: "#fecaca",
+                        padding: "8px 16px",
+                        fontSize: 13,
+                        fontWeight: 700,
+                        textAlign: "center",
+                        letterSpacing: "0.02em",
+                    }}
+                >
+                    You are offline — live incident &amp; alert updates are paused
+                </div>
+            )}
+
+            {/* CRITICAL / HIGH ALERT BANNER */}
+            {criticalBannerAlerts.length > 0 && (
+                <div
+                    style={{
+                        background:
+                            "linear-gradient(90deg, rgba(127,29,29,0.95), rgba(154,52,18,0.95))",
+                        color: "#fff7ed",
+                        padding: "10px 16px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                        flexWrap: "wrap",
+                        borderBottom: "1px solid rgba(251,146,60,0.4)",
+                    }}
+                >
+                    <span
+                        style={{
+                            fontWeight: 800,
+                            fontSize: 12,
+                            letterSpacing: "0.08em",
+                            background: "#ef4444",
+                            padding: "4px 8px",
+                            borderRadius: 6,
+                            animation: "disastraPulse 1.2s ease-in-out infinite",
+                        }}
+                    >
+                        ALERT
+                    </span>
+                    <div style={{ flex: 1, minWidth: 200, fontSize: 13 }}>
+                        <strong>{criticalBannerAlerts[0].title}</strong>
+                        <span style={{ opacity: 0.9 }}>
+                            {" "}
+                            — {criticalBannerAlerts[0].message}
+                            {criticalBannerAlerts[0].location
+                                ? ` · ${criticalBannerAlerts[0].location}`
+                                : ""}
+                        </span>
+                        {criticalBannerAlerts.length > 1 && (
+                            <span style={{ marginLeft: 8, opacity: 0.75 }}>
+                                (+{criticalBannerAlerts.length - 1} more)
+                            </span>
+                        )}
+                    </div>
+                    <button
+                        type="button"
+                        onClick={openNotifPanel}
+                        style={{
+                            border: "1px solid rgba(255,255,255,0.35)",
+                            background: "rgba(0,0,0,0.25)",
+                            color: "#fff",
+                            borderRadius: 8,
+                            padding: "6px 12px",
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            fontSize: 12,
+                        }}
+                    >
+                        View all
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setDismissedBannerIds((prev) => {
+                                const n = new Set(prev);
+                                criticalBannerAlerts.forEach((a) => n.add(alertKey(a)));
+                                return n;
+                            });
+                        }}
+                        style={{
+                            border: "none",
+                            background: "transparent",
+                            color: "#fed7aa",
+                            cursor: "pointer",
+                            fontSize: 12,
+                            fontWeight: 600,
+                        }}
+                    >
+                        Dismiss
+                    </button>
+                </div>
+            )}
+
+            {/* LIVE TOAST STACK */}
+            <div
+                style={{
+                    position: "fixed",
+                    top: 72,
+                    right: 16,
+                    zIndex: 9500,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                    maxWidth: 360,
+                    width: "min(360px, calc(100vw - 32px))",
+                    pointerEvents: "none",
+                }}
+            >
+                {liveToasts.map((t) => {
+                    const color =
+                        t.severity === "CRITICAL"
+                            ? "#ef4444"
+                            : t.severity === "HIGH"
+                              ? "#f97316"
+                              : t.severity === "LOW"
+                                ? "#22d3ee"
+                                : "#eab308";
+                    return (
+                        <div
+                            key={t.id}
+                            style={{
+                                pointerEvents: "auto",
+                                borderRadius: 14,
+                                padding: "12px 14px",
+                                background: "linear-gradient(165deg,#0f172a,#0c1a2e)",
+                                border: `1px solid ${color}55`,
+                                borderLeft: `4px solid ${color}`,
+                                boxShadow: "0 12px 40px rgba(0,0,0,0.45)",
+                                color: "#e2e8f0",
+                                animation: "fundPop 0.3s ease-out",
+                            }}
+                        >
+                            <div
+                                style={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    gap: 8,
+                                    marginBottom: 4,
+                                }}
+                            >
+                                <strong style={{ fontSize: 13 }}>{t.title}</strong>
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setLiveToasts((prev) =>
+                                            prev.filter((x) => x.id !== t.id)
+                                        )
+                                    }
+                                    style={{
+                                        border: "none",
+                                        background: "transparent",
+                                        color: "#94a3b8",
+                                        cursor: "pointer",
+                                        fontSize: 16,
+                                        lineHeight: 1,
+                                    }}
+                                >
+                                    ×
+                                </button>
+                            </div>
+                            <p
+                                style={{
+                                    margin: 0,
+                                    fontSize: 12,
+                                    color: "#cbd5e1",
+                                    lineHeight: 1.4,
+                                }}
+                            >
+                                {t.message}
+                            </p>
+                        </div>
+                    );
+                })}
             </div>
 
             {/* Mobile backdrop overlay */}
@@ -1425,6 +1918,26 @@ function UserDashboard() {
                                                         <span className="active-status">
                                                             ACTIVE
                                                         </span>
+                                                        {newDisasterIds.has(
+                                                            String(disaster.id ?? disaster.title)
+                                                        ) && (
+                                                            <span
+                                                                style={{
+                                                                    marginLeft: 6,
+                                                                    background: "#ef4444",
+                                                                    color: "#fff",
+                                                                    fontSize: 10,
+                                                                    fontWeight: 800,
+                                                                    padding: "2px 7px",
+                                                                    borderRadius: 999,
+                                                                    letterSpacing: "0.04em",
+                                                                    animation:
+                                                                        "disastraPulse 1s ease-in-out infinite",
+                                                                }}
+                                                            >
+                                                                NEW
+                                                            </span>
+                                                        )}
                                                     </div>
                                                     <h3>{disaster.title}</h3>
                                                     <p className="disaster-description">
@@ -2378,13 +2891,33 @@ function UserDashboard() {
                                 zIndex: 1,
                             }}
                         >
-                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
                                 <NotifBellIcon size={16} />
                                 <strong style={{ fontSize: 14 }}>
                                     Alerts &amp; notifications
                                     {unreadCount > 0 ? ` (${unreadCount} new)` : ""}
                                 </strong>
                             </div>
+                            <button
+                                type="button"
+                                onClick={requestBrowserNotifications}
+                                title="Enable desktop notifications"
+                                style={{
+                                    border: "1px solid rgba(52,211,153,0.35)",
+                                    background: browserNotifEnabled
+                                        ? "rgba(16,185,129,0.2)"
+                                        : "transparent",
+                                    color: browserNotifEnabled ? "#6ee7b7" : "#94a3b8",
+                                    borderRadius: 8,
+                                    padding: "4px 8px",
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    cursor: "pointer",
+                                    marginRight: 6,
+                                }}
+                            >
+                                {browserNotifEnabled ? "Desktop ON" : "Desktop alerts"}
+                            </button>
                             <button
                                 type="button"
                                 className="user-notif-close"
@@ -2775,6 +3308,13 @@ function UserDashboard() {
                     `}</style>
                 </div>
             )}
+
+            <style>{`
+                @keyframes disastraPulse {
+                    0%, 100% { opacity: 1; transform: scale(1); }
+                    50% { opacity: 0.75; transform: scale(1.04); }
+                }
+            `}</style>
 
             <AIAssist compact context={{ disasters, climate }} />
         </div>
