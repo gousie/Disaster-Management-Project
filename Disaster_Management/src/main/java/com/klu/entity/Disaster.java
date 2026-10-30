@@ -2,6 +2,8 @@ package com.klu.entity;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "disasters")
@@ -32,6 +34,39 @@ public class Disaster {
     @Column(columnDefinition = "TEXT")
     private String imageUrl;
 
+    /**
+     * Extra details shown when user opens the post
+     * (safety tips, evacuation routes, contacts, updates…).
+     */
+    @Column(name = "extra_details", columnDefinition = "TEXT")
+    private String extraDetails;
+
+    /**
+     * Extra gallery image URLs (slideshow on post click).
+     * Table: disaster_gallery
+     */
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(
+            name = "disaster_gallery",
+            joinColumns = @JoinColumn(name = "disaster_id")
+    )
+    @Column(name = "image_url", length = 2048)
+    @OrderColumn(name = "sort_order")
+    private List<String> gallery = new ArrayList<>();
+
+    /**
+     * Extra video URLs (play + download on post click).
+     * Table: disaster_videos
+     */
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(
+            name = "disaster_videos",
+            joinColumns = @JoinColumn(name = "disaster_id")
+    )
+    @Column(name = "video_url", length = 2048)
+    @OrderColumn(name = "sort_order")
+    private List<String> videos = new ArrayList<>();
+
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;
@@ -40,11 +75,15 @@ public class Disaster {
     public void createDate() {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
+        if (gallery == null) gallery = new ArrayList<>();
+        if (videos == null) videos = new ArrayList<>();
     }
 
     @PreUpdate
     public void updateDate() {
         updatedAt = LocalDateTime.now();
+        if (gallery == null) gallery = new ArrayList<>();
+        if (videos == null) videos = new ArrayList<>();
     }
 
     public Long getId() { return id; }
@@ -76,6 +115,19 @@ public class Disaster {
 
     public String getImageUrl() { return imageUrl; }
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
+
+    public String getExtraDetails() { return extraDetails; }
+    public void setExtraDetails(String extraDetails) { this.extraDetails = extraDetails; }
+
+    public List<String> getGallery() { return gallery; }
+    public void setGallery(List<String> gallery) {
+        this.gallery = gallery != null ? gallery : new ArrayList<>();
+    }
+
+    public List<String> getVideos() { return videos; }
+    public void setVideos(List<String> videos) {
+        this.videos = videos != null ? videos : new ArrayList<>();
+    }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
