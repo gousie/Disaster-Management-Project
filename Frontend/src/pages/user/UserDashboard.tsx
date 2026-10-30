@@ -96,6 +96,64 @@ function getStoredUser() {
     return { name: "User", email: "user@disastra.local" };
 }
 
+/** Same Alert shape as AdminDashboard — loaded from GET /alerts */
+interface AlertMessage {
+    id?: number | string;
+    title: string;
+    message: string;
+    severity?: string;
+    location?: string;
+    active?: boolean;
+    createdAt?: string;
+}
+
+const ALERTS_READ_KEY = "disastra_alerts_read";
+
+function getReadAlertIds(): Set<string> {
+    try {
+        const raw = localStorage.getItem(ALERTS_READ_KEY);
+        if (!raw) return new Set();
+        const arr = JSON.parse(raw);
+        return new Set(Array.isArray(arr) ? arr.map(String) : []);
+    } catch {
+        return new Set();
+    }
+}
+
+function markAlertsRead(ids: string[]) {
+    try {
+        const prev = getReadAlertIds();
+        ids.forEach((id) => prev.add(String(id)));
+        localStorage.setItem(ALERTS_READ_KEY, JSON.stringify([...prev]));
+    } catch {
+        /* */
+    }
+}
+
+function alertKey(a: AlertMessage): string {
+    return String(a.id ?? a.createdAt ?? a.title);
+}
+
+/** Same bell shape as admin Icon "notification" */
+function NotifBellIcon({ size = 18 }: { size?: number }) {
+    return (
+        <svg
+            width={size}
+            height={size}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+        >
+            <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+            <path d="M10 21h4" />
+        </svg>
+    );
+}
+
 function SeverityChart({ disasters }: { disasters: Disaster[] }) {
     const levels = ["CRITICAL", "HIGH", "MEDIUM", "LOW"] as const;
     const colors: Record<string, string> = {
@@ -402,6 +460,44 @@ function UserDashboard() {
     const [activeHazard, setActiveHazard] = useState(0);
     const chatEndRef = useRef<HTMLDivElement>(null);
 
+    // Admin alert notifications — same API as AdminDashboard (/alerts)
+    const [alerts, setAlerts] = useState<AlertMessage[]>([]);
+    const [readAlertIds, setReadAlertIds] = useState<Set<string>>(() => getReadAlertIds());
+    const [showNotifPanel, setShowNotifPanel] = useState(false);
+    const notifPanelRef = useRef<HTMLDivElement>(null);
+
+    const activeAlerts = useMemo(
+        () => alerts.filter((a) => a.active !== false),
+        [alerts]
+    );
+
+    const unreadAlerts = useMemo(
+        () => activeAlerts.filter((a) => !readAlertIds.has(alertKey(a))),
+        [activeAlerts, readAlertIds]
+    );
+    const unreadCount = unreadAlerts.length;
+
+    const loadAlerts = async () => {
+        try {
+            const response = await api.get("/alerts");
+            const data = (response.data as AlertMessage[]) || [];
+            setAlerts(Array.isArray(data) ? data : []);
+            setReadAlertIds(getReadAlertIds());
+        } catch (err) {
+            console.error("Unable to load alerts", err);
+        }
+    };
+
+    const openNotifPanel = () => {
+        const willOpen = !showNotifPanel;
+        setShowNotifPanel(willOpen);
+        if (willOpen && activeAlerts.length > 0) {
+            const ids = activeAlerts.map((a) => alertKey(a));
+            markAlertsRead(ids);
+            setReadAlertIds(getReadAlertIds());
+        }
+    };
+
     const loadDisasters = async () => {
         try {
             const response = await api.get("/disasters");
@@ -537,6 +633,7 @@ function UserDashboard() {
         loadClimate(CLIMATE_LOCATIONS[0]);
         loadLiveNews();
         refreshChat();
+        loadAlerts();
         const unsub = subscribeChat(refreshChat);
         const unsubImg = subscribeImages(() => loadDisasters());
         const refreshContent = () => {
@@ -550,6 +647,7 @@ function UserDashboard() {
         const timer = setInterval(() => {
             loadDisasters();
             refreshChat();
+            loadAlerts();
         }, 5000);
         const newsTimer = setInterval(loadLiveNews, 120000);
         return () => {
@@ -560,6 +658,19 @@ function UserDashboard() {
             unsubContent();
         };
     }, []);
+
+    // Close notification panel on outside click
+    useEffect(() => {
+        if (!showNotifPanel) return;
+        const onDocClick = (e: MouseEvent) => {
+            const t = e.target as Node;
+            if (notifPanelRef.current && !notifPanelRef.current.contains(t)) {
+                setShowNotifPanel(false);
+            }
+        };
+        document.addEventListener("mousedown", onDocClick);
+        return () => document.removeEventListener("mousedown", onDocClick);
+    }, [showNotifPanel]);
 
     useEffect(() => {
         loadClimate(climateLoc);
@@ -853,6 +964,7 @@ function UserDashboard() {
                 e.preventDefault();
                 searchInputRef.current?.focus();
             } else if (e.key === "Escape") {
+                if (showNotifPanel) setShowNotifPanel(false);
                 if (showLogoutModal) setShowLogoutModal(false);
                 if (showEmergencyModal) setShowEmergencyModal(false);
                 if (searchQuery) setSearchQuery("");
@@ -861,7 +973,7 @@ function UserDashboard() {
         };
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [showLogoutModal, showEmergencyModal, searchQuery, mobileSidebarOpen]);
+    }, [showLogoutModal, showEmergencyModal, searchQuery, mobileSidebarOpen, showNotifPanel]);
 
     const scrollTo = (id: string) => {
         setActiveNav(id);
@@ -966,6 +1078,67 @@ function UserDashboard() {
                                 <span>Dial 112 · Helplines</span>
                             </div>
                             <span className="sos-arrow">→</span>
+                        </button>
+                    )}
+
+                    {/* Sidebar notification shortcut (mirrors admin bell) */}
+                    {!sidebarCollapsed && (
+                        <button
+                            type="button"
+                            className="sidebar-notif-btn"
+                            onClick={openNotifPanel}
+                            title="Admin alert messages"
+                            style={{
+                                margin: "0 12px 8px",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 10,
+                                width: "calc(100% - 24px)",
+                                padding: "10px 12px",
+                                borderRadius: 12,
+                                border: "1px solid rgba(52,211,153,0.25)",
+                                background: unreadCount
+                                    ? "rgba(239,68,68,0.12)"
+                                    : "rgba(15,23,42,0.4)",
+                                color: "#e2e8f0",
+                                cursor: "pointer",
+                                fontSize: 13,
+                            }}
+                        >
+                            <span style={{ position: "relative", display: "inline-flex" }}>
+                                <NotifBellIcon size={16} />
+                                {unreadCount > 0 && (
+                                    <span
+                                        style={{
+                                            position: "absolute",
+                                            top: -6,
+                                            right: -8,
+                                            minWidth: 16,
+                                            height: 16,
+                                            borderRadius: 999,
+                                            background: "#ef4444",
+                                            color: "#fff",
+                                            fontSize: 9,
+                                            fontWeight: 800,
+                                            lineHeight: "16px",
+                                            textAlign: "center",
+                                            padding: "0 3px",
+                                        }}
+                                    >
+                                        {unreadCount > 9 ? "9+" : unreadCount}
+                                    </span>
+                                )}
+                            </span>
+                            <span style={{ flex: 1, textAlign: "left", fontWeight: 600 }}>
+                                Notifications
+                            </span>
+                            {unreadCount > 0 ? (
+                                <span style={{ color: "#fca5a5", fontSize: 11, fontWeight: 700 }}>
+                                    {unreadCount} new
+                                </span>
+                            ) : (
+                                <span style={{ color: "#64748b", fontSize: 11 }}>All clear</span>
+                            )}
                         </button>
                     )}
 
@@ -1127,6 +1300,57 @@ function UserDashboard() {
                             <div className="user-stat-chip chip-blue">
                                 <strong>{disasters.length}</strong>
                                 <span>Total</span>
+                            </div>
+                            {/* Notification bell — same as admin for alert messages */}
+                            <div className="user-notif-wrap" style={{ position: "relative" }}>
+                                <button
+                                    type="button"
+                                    className="user-notif-btn"
+                                    onClick={openNotifPanel}
+                                    title="Admin alerts & notifications"
+                                    aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ""}`}
+                                    aria-expanded={showNotifPanel}
+                                    style={{
+                                        position: "relative",
+                                        width: 40,
+                                        height: 40,
+                                        borderRadius: 12,
+                                        border: "1px solid rgba(52,211,153,0.35)",
+                                        background: showNotifPanel
+                                            ? "rgba(16,185,129,0.25)"
+                                            : "rgba(15,23,42,0.55)",
+                                        color: "#ecfdf5",
+                                        cursor: "pointer",
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                    }}
+                                >
+                                    <NotifBellIcon size={18} />
+                                    {unreadCount > 0 && (
+                                        <span
+                                            className="user-notif-badge"
+                                            style={{
+                                                position: "absolute",
+                                                top: -4,
+                                                right: -4,
+                                                minWidth: 18,
+                                                height: 18,
+                                                padding: "0 5px",
+                                                borderRadius: 999,
+                                                background: "#ef4444",
+                                                color: "#fff",
+                                                fontSize: 10,
+                                                fontWeight: 800,
+                                                lineHeight: "18px",
+                                                textAlign: "center",
+                                                boxShadow: "0 0 0 2px #0f172a",
+                                            }}
+                                        >
+                                            {unreadCount > 9 ? "9+" : unreadCount}
+                                        </span>
+                                    )}
+                                </button>
                             </div>
                             <ThemeToggle />
                             <div className="user-profile">{user.name || "User"}</div>
@@ -2102,6 +2326,212 @@ function UserDashboard() {
                     }}
                     getImage={getDisasterImage}
                 />
+            )}
+
+            {/* ADMIN ALERT NOTIFICATIONS PANEL */}
+            {showNotifPanel && (
+                <div
+                    className="disastra-modal-backdrop"
+                    onClick={() => setShowNotifPanel(false)}
+                    style={{
+                        position: "fixed",
+                        inset: 0,
+                        zIndex: 9000,
+                        background: "rgba(2, 12, 27, 0.55)",
+                        backdropFilter: "blur(4px)",
+                        display: "flex",
+                        alignItems: "flex-start",
+                        justifyContent: "flex-end",
+                        padding: "72px 16px 16px",
+                    }}
+                >
+                    <div
+                        ref={notifPanelRef}
+                        className="user-notif-panel"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label="Notifications"
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                            width: 360,
+                            maxWidth: "100%",
+                            maxHeight: "min(480px, calc(100vh - 96px))",
+                            overflow: "auto",
+                            borderRadius: 16,
+                            background: "linear-gradient(165deg, #0f172a 0%, #0c1a2e 100%)",
+                            border: "1px solid rgba(52,211,153,0.3)",
+                            boxShadow: "0 20px 50px rgba(0,0,0,0.45)",
+                            color: "#e2e8f0",
+                        }}
+                    >
+                        <div
+                            className="user-notif-panel-head"
+                            style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                padding: "14px 16px",
+                                borderBottom: "1px solid rgba(148,163,184,0.2)",
+                                position: "sticky",
+                                top: 0,
+                                background: "#0f172a",
+                                zIndex: 1,
+                            }}
+                        >
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <NotifBellIcon size={16} />
+                                <strong style={{ fontSize: 14 }}>
+                                    Alerts &amp; notifications
+                                    {unreadCount > 0 ? ` (${unreadCount} new)` : ""}
+                                </strong>
+                            </div>
+                            <button
+                                type="button"
+                                className="user-notif-close"
+                                onClick={() => setShowNotifPanel(false)}
+                                aria-label="Close"
+                                style={{
+                                    border: "none",
+                                    background: "transparent",
+                                    color: "#94a3b8",
+                                    cursor: "pointer",
+                                    padding: 4,
+                                }}
+                            >
+                                <UserIcon name="close" size={16} />
+                            </button>
+                        </div>
+                        {activeAlerts.length === 0 ? (
+                            <div
+                                className="user-notif-empty"
+                                style={{
+                                    padding: 28,
+                                    textAlign: "center",
+                                    color: "#94a3b8",
+                                    fontSize: 13,
+                                }}
+                            >
+                                No active notifications
+                            </div>
+                        ) : (
+                            <ul
+                                className="user-notif-list"
+                                style={{
+                                    listStyle: "none",
+                                    margin: 0,
+                                    padding: 10,
+                                }}
+                            >
+                                {activeAlerts.map((a) => {
+                                    const key = alertKey(a);
+                                    const isRead = readAlertIds.has(key);
+                                    const sev = (a.severity || "MEDIUM").toUpperCase();
+                                    const sevColor =
+                                        sev === "CRITICAL"
+                                            ? "#ef4444"
+                                            : sev === "HIGH"
+                                              ? "#f97316"
+                                              : sev === "LOW"
+                                                ? "#22d3ee"
+                                                : "#eab308";
+                                    return (
+                                        <li
+                                            key={key}
+                                            className={`user-notif-item severity-${sev.toLowerCase()} ${
+                                                isRead ? "is-read" : "is-unread"
+                                            }`}
+                                            style={{
+                                                padding: "12px 12px",
+                                                marginBottom: 8,
+                                                borderRadius: 12,
+                                                background: isRead
+                                                    ? "rgba(30,41,59,0.6)"
+                                                    : "rgba(16,185,129,0.12)",
+                                                borderLeft: `3px solid ${sevColor}`,
+                                            }}
+                                        >
+                                            <div
+                                                style={{
+                                                    display: "flex",
+                                                    justifyContent: "space-between",
+                                                    gap: 8,
+                                                    marginBottom: 4,
+                                                    fontSize: 11,
+                                                }}
+                                            >
+                                                <span
+                                                    style={{
+                                                        color: sevColor,
+                                                        fontWeight: 800,
+                                                        letterSpacing: "0.04em",
+                                                    }}
+                                                >
+                                                    {sev}
+                                                    {a.active !== false && (
+                                                        <b
+                                                            style={{
+                                                                marginLeft: 8,
+                                                                color: "#34d399",
+                                                                fontWeight: 700,
+                                                            }}
+                                                        >
+                                                            ACTIVE
+                                                        </b>
+                                                    )}
+                                                </span>
+                                                {a.createdAt && (
+                                                    <time style={{ color: "#94a3b8" }}>
+                                                        {new Date(a.createdAt).toLocaleString(
+                                                            "en-IN",
+                                                            {
+                                                                day: "2-digit",
+                                                                month: "short",
+                                                                hour: "2-digit",
+                                                                minute: "2-digit",
+                                                            }
+                                                        )}
+                                                    </time>
+                                                )}
+                                            </div>
+                                            <strong
+                                                style={{
+                                                    display: "block",
+                                                    fontSize: 13,
+                                                    marginBottom: 4,
+                                                }}
+                                            >
+                                                {a.title}
+                                            </strong>
+                                            <p
+                                                style={{
+                                                    margin: 0,
+                                                    fontSize: 12,
+                                                    lineHeight: 1.45,
+                                                    color: "#cbd5e1",
+                                                    whiteSpace: "pre-wrap",
+                                                }}
+                                            >
+                                                {a.message}
+                                            </p>
+                                            {a.location && (
+                                                <small
+                                                    style={{
+                                                        display: "block",
+                                                        marginTop: 6,
+                                                        color: "#94a3b8",
+                                                        fontSize: 11,
+                                                    }}
+                                                >
+                                                    {a.location}
+                                                </small>
+                                            )}
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        )}
+                    </div>
+                </div>
             )}
 
             {/* EMERGENCY SOS MODAL */}
