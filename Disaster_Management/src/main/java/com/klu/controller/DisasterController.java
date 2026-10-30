@@ -10,7 +10,12 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/disasters")
-@CrossOrigin(origins = {"http://localhost:5173", "http://localhost:5174"})
+@CrossOrigin(origins = {
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174"
+})
 public class DisasterController {
 
     private final DisasterRepository repo;
@@ -36,7 +41,6 @@ public class DisasterController {
         return repo.findByStatus(status);
     }
 
-    /** Create — JSON body is bound to Disaster (including extraDetails, gallery, videos). */
     @PostMapping
     public Disaster create(@RequestBody Disaster disaster) {
         if (disaster.getGallery() == null) {
@@ -67,7 +71,6 @@ public class DisasterController {
         d.setLongitude(data.getLongitude());
         d.setStatus(data.getStatus());
 
-        // Persist image so User & Admin always match
         if (data.getImageUrl() != null) {
             d.setImageUrl(data.getImageUrl());
         }
