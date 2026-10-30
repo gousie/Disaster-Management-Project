@@ -3314,6 +3314,181 @@ function UserDashboard() {
                     0%, 100% { opacity: 1; transform: scale(1); }
                     50% { opacity: 0.75; transform: scale(1.04); }
                 }
+
+                /* ===== MOBILE / RESPONSIVE FIXES ===== */
+                .user-header.ndma-hero {
+                    display: flex;
+                    flex-wrap: wrap;
+                    align-items: flex-start;
+                    gap: 20px;
+                    padding: 28px 24px;
+                    box-sizing: border-box;
+                    width: 100%;
+                    max-width: 100%;
+                    overflow: hidden;
+                }
+                .ndma-hero-text {
+                    flex: 1 1 280px;
+                    min-width: 0;
+                    max-width: 100%;
+                }
+                .ndma-hero-text .system-status {
+                    display: inline-block;
+                    font-size: 11px;
+                    letter-spacing: 0.08em;
+                    font-weight: 700;
+                    opacity: 0.85;
+                    word-break: break-word;
+                    max-width: 100%;
+                }
+                .ndma-hero-text h1 {
+                    margin: 10px 0 12px;
+                    font-size: clamp(1.45rem, 4.5vw, 2.35rem);
+                    line-height: 1.15;
+                    letter-spacing: -0.02em;
+                    word-wrap: break-word;
+                    overflow-wrap: break-word;
+                    max-width: 100%;
+                }
+                .ndma-hero-text p {
+                    margin: 0 0 16px;
+                    font-size: clamp(0.88rem, 2.4vw, 1.02rem);
+                    line-height: 1.55;
+                    max-width: 54ch;
+                    opacity: 0.9;
+                    word-wrap: break-word;
+                    overflow-wrap: break-word;
+                }
+                .ndma-hero-actions {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 10px;
+                }
+                .ndma-hero-actions .ndma-btn {
+                    flex: 1 1 auto;
+                    min-width: min(100%, 160px);
+                    text-align: center;
+                    white-space: normal;
+                    line-height: 1.3;
+                    padding: 10px 14px;
+                }
+                .user-stats-row {
+                    display: flex;
+                    flex-wrap: wrap;
+                    align-items: center;
+                    gap: 10px;
+                    flex: 0 1 auto;
+                    max-width: 100%;
+                }
+                .user-stat-chip {
+                    min-width: 72px;
+                }
+
+                @media (max-width: 900px) {
+                    .user-header.ndma-hero {
+                        flex-direction: column;
+                        padding: 20px 16px;
+                        gap: 16px;
+                    }
+                    .ndma-hero-text {
+                        flex: 1 1 100%;
+                        width: 100%;
+                    }
+                    .ndma-hero-text p {
+                        max-width: 100%;
+                    }
+                    .user-stats-row {
+                        width: 100%;
+                        justify-content: flex-start;
+                    }
+                    .ndma-hero-actions {
+                        width: 100%;
+                    }
+                    .ndma-hero-actions .ndma-btn {
+                        flex: 1 1 calc(50% - 6px);
+                    }
+                }
+
+                @media (max-width: 600px) {
+                    .user-header.ndma-hero {
+                        padding: 16px 12px;
+                        gap: 14px;
+                    }
+                    .ndma-hero-text .system-status {
+                        font-size: 10px;
+                        letter-spacing: 0.04em;
+                    }
+                    .ndma-hero-text h1 {
+                        font-size: 1.35rem;
+                        margin: 8px 0 10px;
+                    }
+                    .ndma-hero-text p {
+                        font-size: 0.86rem;
+                        line-height: 1.5;
+                        margin-bottom: 14px;
+                    }
+                    .ndma-hero-actions {
+                        flex-direction: column;
+                    }
+                    .ndma-hero-actions .ndma-btn {
+                        width: 100%;
+                        flex: 1 1 100%;
+                    }
+                    .user-stats-row {
+                        gap: 8px;
+                    }
+                    .user-stat-chip {
+                        flex: 1 1 calc(33.33% - 8px);
+                        min-width: 0;
+                        text-align: center;
+                    }
+                    .user-profile {
+                        display: none;
+                    }
+                    .news-ticker {
+                        padding-right: 4px;
+                    }
+                    .user-section {
+                        padding-left: 12px !important;
+                        padding-right: 12px !important;
+                    }
+                    .user-disaster-grid {
+                        grid-template-columns: 1fr !important;
+                    }
+                    .user-climate-grid {
+                        grid-template-columns: 1fr 1fr !important;
+                    }
+                    .form-row {
+                        flex-direction: column !important;
+                    }
+                    .dos-donts-grid {
+                        grid-template-columns: 1fr !important;
+                    }
+                    .ndma-resource-grid,
+                    .ndma-dm-grid,
+                    .ndma-social-grid,
+                    .ndma-sites-grid,
+                    .videos-grid,
+                    .helplines-grid {
+                        grid-template-columns: 1fr !important;
+                    }
+                    .guidelines-table-wrap {
+                        overflow-x: auto;
+                        -webkit-overflow-scrolling: touch;
+                    }
+                    .user-notif-panel {
+                        max-width: calc(100vw - 24px) !important;
+                    }
+                }
+
+                @media (max-width: 380px) {
+                    .ndma-hero-text h1 {
+                        font-size: 1.2rem;
+                    }
+                    .user-stat-chip strong {
+                        font-size: 1.05rem;
+                    }
+                }
             `}</style>
 
             <AIAssist compact context={{ disasters, climate }} />
