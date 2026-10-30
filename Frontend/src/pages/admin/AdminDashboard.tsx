@@ -907,6 +907,12 @@ function AdminDashboard() {
                         },
                         disasterForm.title
                     );
+                    try {
+                        localStorage.setItem(
+                            "disastra_content_ping",
+                            String(Date.now())
+                        );
+                    } catch (_) {}
                 }
 
             } else {
@@ -953,6 +959,12 @@ function AdminDashboard() {
                         },
                         disasterForm.title
                     );
+                    try {
+                        localStorage.setItem(
+                            "disastra_content_ping",
+                            String(Date.now())
+                        );
+                    } catch (_) {}
                 }
 
                 showMessage(
@@ -3802,6 +3814,12 @@ function AdminDashboard() {
                                     setVideosList(getVideos());
                                     setVideoForm({ youtubeUrl: "", title: "", description: "" });
                                     setContentMsg("Video added — visible to users now");
+                                    try {
+                                        localStorage.setItem(
+                                            "disastra_content_ping",
+                                            String(Date.now())
+                                        );
+                                    } catch (_) {}
                                     setTimeout(() => setContentMsg(""), 3000);
                                 }}
                             >
@@ -3844,13 +3862,32 @@ function AdminDashboard() {
                         <div className="admin-videos-grid">
                             {videos.map((v) => (
                                 <article key={v.id} className="admin-video-card">
-                                    <div className="admin-video-embed">
+                                    <div
+                                        className="admin-video-embed"
+                                        style={{
+                                            position: "relative",
+                                            width: "100%",
+                                            height: 0,
+                                            paddingTop: "56.25%",
+                                            background: "#0a1628",
+                                            overflow: "hidden",
+                                        }}
+                                    >
                                         <iframe
                                             src={`https://www.youtube.com/embed/${v.youtubeId}`}
                                             title={v.title}
                                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                             allowFullScreen
                                             loading="lazy"
+                                            style={{
+                                                position: "absolute",
+                                                top: 0,
+                                                left: 0,
+                                                width: "100%",
+                                                height: "100%",
+                                                border: 0,
+                                                display: "block",
+                                            }}
                                         />
                                     </div>
                                     <div className="admin-video-meta">
