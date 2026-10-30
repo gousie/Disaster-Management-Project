@@ -48,6 +48,124 @@ import "./AdminDashboard.css";
 
 
 /* =========================================================
+   EXTRAS SYNC (cross-device via API description marker)
+========================================================= */
+
+const EXTRAS_MARKER_START = "<!--DISASTRA_EXTRAS:";
+const EXTRAS_MARKER_END = ":DISASTRA_EXTRAS-->";
+
+function encodeExtrasIntoDescription(
+    description: string,
+    extras: { extraDetails?: string; gallery?: string[]; videos?: string[] }
+) {
+    const clean = (description || "")
+        .replace(
+            new RegExp(
+                EXTRAS_MARKER_START.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") +
+                    "[\\s\\S]*?" +
+                    EXTRAS_MARKER_END.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+                "g"
+            ),
+            ""
+        )
+        .trimEnd();
+    const payload = {
+        extraDetails: extras.extraDetails || "",
+        gallery: Array.isArray(extras.gallery) ? extras.gallery.filter(Boolean) : [],
+        videos: Array.isArray(extras.videos) ? extras.videos.filter(Boolean) : [],
+    };
+    const has =
+        (payload.extraDetails && payload.extraDetails.trim()) ||
+        payload.gallery.length > 0 ||
+        payload.videos.length > 0;
+    if (!has) return clean;
+    try {
+        const b64 =
+            typeof btoa !== "undefined"
+                ? btoa(unescape(encodeURIComponent(JSON.stringify(payload))))
+                : "";
+        if (!b64) return clean;
+        return `${clean}\n\n${EXTRAS_MARKER_START}${b64}${EXTRAS_MARKER_END}`;
+    } catch {
+        return clean;
+    }
+}
+
+function parseExtrasFromDescription(description?: string): {
+    visibleDescription: string;
+    extraDetails: string;
+    gallery: string[];
+    videos: string[];
+} {
+    const raw = description || "";
+    const start = raw.indexOf(EXTRAS_MARKER_START);
+    const end = raw.indexOf(EXTRAS_MARKER_END);
+    if (start === -1 || end === -1 || end <= start) {
+        return {
+            visibleDescription: raw,
+            extraDetails: "",
+            gallery: [],
+            videos: [],
+        };
+    }
+    const b64 = raw.slice(start + EXTRAS_MARKER_START.length, end);
+    const visibleDescription = (
+        raw.slice(0, start) + raw.slice(end + EXTRAS_MARKER_END.length)
+    ).trim();
+    try {
+        const json = decodeURIComponent(escape(atob(b64)));
+        const obj = JSON.parse(json) || {};
+        return {
+            visibleDescription,
+            extraDetails: String(obj.extraDetails || ""),
+            gallery: Array.isArray(obj.gallery) ? obj.gallery.filter(Boolean).map(String) : [],
+            videos: Array.isArray(obj.videos) ? obj.videos.filter(Boolean).map(String) : [],
+        };
+    } catch {
+        return {
+            visibleDescription: raw,
+            extraDetails: "",
+            gallery: [],
+            videos: [],
+        };
+    }
+}
+
+function resolveDisasterExtras(
+    disaster: { id?: number; title?: string; description?: string },
+    localFallback?: { extraDetails?: string; gallery?: string[]; videos?: string[] }
+) {
+    const parsed = parseExtrasFromDescription(disaster.description);
+    const local =
+        localFallback ||
+        (typeof getExtras === "function"
+            ? getExtras(disaster.id) ||
+              getExtras(`title:${(disaster.title || "").trim().toLowerCase()}`)
+            : { extraDetails: "", gallery: [], videos: [] });
+    return {
+        visibleDescription: parsed.visibleDescription,
+        extraDetails:
+            parsed.extraDetails ||
+            local.extraDetails ||
+            "",
+        gallery:
+            parsed.gallery.length > 0
+                ? parsed.gallery
+                : Array.isArray(local.gallery)
+                  ? local.gallery
+                  : [],
+        videos:
+            parsed.videos.length > 0
+                ? parsed.videos
+                : Array.isArray(local.videos)
+                  ? local.videos
+                  : [],
+    };
+}
+
+
+
+/* =========================================================
    TYPES
 ========================================================= */
 
@@ -62,6 +180,10 @@ interface Disaster {
     longitude?: number | null;
     status: string;
     imageUrl?: string;
+    /** Persisted in DB — shown in post modal on all devices */
+    extraDetails?: string;
+    gallery?: string[];
+    videos?: string[];
     createdAt?: string;
     updatedAt?: string;
 }
@@ -853,7 +975,12 @@ function AdminDashboard() {
                     {
                         title: disasterForm.title,
                         type: disasterForm.type,
-                        description: disasterForm.description,
+                        description: parseExtrasFromDescription(disasterForm.description)
+                            .visibleDescription || disasterForm.description,
+                        // DB columns (preferred cross-device storage)
+                        extraDetails: extraDetailsForm || "",
+                        gallery: galleryForm || [],
+                        videos: videoGalleryForm || [],
                         severity: disasterForm.severity,
                         location: disasterForm.location,
                         latitude: disasterForm.latitude,
@@ -922,7 +1049,12 @@ function AdminDashboard() {
                     {
                         title: disasterForm.title,
                         type: disasterForm.type,
-                        description: disasterForm.description,
+                        description: parseExtrasFromDescription(disasterForm.description)
+                            .visibleDescription || disasterForm.description,
+                        // DB columns (preferred cross-device storage)
+                        extraDetails: extraDetailsForm || "",
+                        gallery: galleryForm || [],
+                        videos: videoGalleryForm || [],
                         severity: disasterForm.severity,
                         location: disasterForm.location,
                         latitude: disasterForm.latitude,
@@ -1029,10 +1161,37 @@ function AdminDashboard() {
         );
 
         {
-            const ex = getExtras(disaster.id);
-            setExtraDetailsForm(ex.extraDetails || "");
-            setGalleryForm(ex.gallery || []);
-            setVideoGalleryForm(ex.videos || []);
+            // Prefer DB fields from API; fall back to embedded marker / localStorage
+            const fromApi = {
+                extraDetails: disaster.extraDetails || "",
+                gallery: Array.isArray(disaster.gallery) ? disaster.gallery : [],
+                videos: Array.isArray(disaster.videos) ? disaster.videos : [],
+            };
+            const resolved = resolveDisasterExtras(disaster);
+            const extraDetails =
+                fromApi.extraDetails || resolved.extraDetails || "";
+            const gallery =
+                fromApi.gallery.length > 0 ? fromApi.gallery : resolved.gallery;
+            const videos =
+                fromApi.videos.length > 0 ? fromApi.videos : resolved.videos;
+            setDisasterForm((prev) => ({
+                ...prev,
+                description:
+                    resolved.visibleDescription ||
+                    parseExtrasFromDescription(disaster.description)
+                        .visibleDescription ||
+                    prev.description,
+            }));
+            setExtraDetailsForm(extraDetails);
+            setGalleryForm(gallery);
+            setVideoGalleryForm(videos);
+            if (disaster.id != null) {
+                setExtras(
+                    disaster.id,
+                    { extraDetails, gallery, videos },
+                    disaster.title
+                );
+            }
         }
 
         setActivePage(
@@ -2976,7 +3135,9 @@ function AdminDashboard() {
 
                                                 <p className="disaster-description">
                                                     {
-                                                        disaster.description
+                                                        parseExtrasFromDescription(
+                                                            disaster.description
+                                                        ).visibleDescription
                                                     }
                                                 </p>
 
