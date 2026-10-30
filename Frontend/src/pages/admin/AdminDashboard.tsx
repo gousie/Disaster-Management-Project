@@ -522,6 +522,7 @@ function AdminDashboard() {
 
     const [extraDetailsForm, setExtraDetailsForm] = useState("");
     const [galleryForm, setGalleryForm] = useState<string[]>([]);
+    const [videoGalleryForm, setVideoGalleryForm] = useState<string[]>([]);
     const [search, setSearch] =
         useState("");
 
@@ -806,6 +807,7 @@ function AdminDashboard() {
                         {
                             extraDetails: extraDetailsForm,
                             gallery: galleryForm,
+                            videos: videoGalleryForm,
                         },
                         disasterForm.title
                     );
@@ -901,6 +903,7 @@ function AdminDashboard() {
                         {
                             extraDetails: extraDetailsForm,
                             gallery: galleryForm,
+                            videos: videoGalleryForm,
                         },
                         disasterForm.title
                     );
@@ -931,24 +934,25 @@ function AdminDashboard() {
 
                 // Remember this image link for the same reason as
                 // the edit branch above.
-                if (
-                    response.data?.id !== undefined &&
-                    disasterForm.imageUrl &&
-                    disasterForm.imageUrl.trim() !== ""
-                ) {
-                    imageOverridesRef.current[
-                        response.data.id
-                    ] = disasterForm.imageUrl.trim();
-                    setDisasterImage(response.data.id, absoluteMediaUrl(normalizeImageUrl(disasterForm.imageUrl) || disasterForm.imageUrl.trim()), disasterForm.title);
+                if (response.data?.id !== undefined) {
+                    if (
+                        disasterForm.imageUrl &&
+                        disasterForm.imageUrl.trim() !== ""
+                    ) {
+                        imageOverridesRef.current[
+                            response.data.id
+                        ] = disasterForm.imageUrl.trim();
+                        setDisasterImage(response.data.id, absoluteMediaUrl(normalizeImageUrl(disasterForm.imageUrl) || disasterForm.imageUrl.trim()), disasterForm.title);
+                    }
                     setExtras(
                         response.data.id,
                         {
                             extraDetails: extraDetailsForm,
                             gallery: galleryForm,
+                            videos: videoGalleryForm,
                         },
                         disasterForm.title
                     );
-
                 }
 
                 showMessage(
@@ -966,6 +970,7 @@ function AdminDashboard() {
             setEditingDisasterId(null);
             setExtraDetailsForm("");
             setGalleryForm([]);
+            setVideoGalleryForm([]);
 
 
         } catch (err) {
@@ -1015,6 +1020,7 @@ function AdminDashboard() {
             const ex = getExtras(disaster.id);
             setExtraDetailsForm(ex.extraDetails || "");
             setGalleryForm(ex.gallery || []);
+            setVideoGalleryForm(ex.videos || []);
         }
 
         setActivePage(
@@ -3598,6 +3604,92 @@ function AdminDashboard() {
                                     </div>
                                 </div>
 
+                                <div className="form-field full" style={{ marginTop: 18 }}>
+                                    <label>Extra videos (view + download on post click)</label>
+                                    <p style={{ margin: "4px 0 10px", fontSize: 12, color: "#94a3b8" }}>
+                                        Upload MP4 / WebM / MOV. High-quality files are supported. Users can play and download them on the incident detail view (desktop &amp; mobile).
+                                    </p>
+                                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10, alignItems: "center" }}>
+                                        <label style={{ padding: "8px 12px", borderRadius: 10, background: "rgba(59,130,246,0.2)", border: "1px solid rgba(96,165,250,0.4)", cursor: "pointer", fontSize: 13, fontWeight: 700, color: "#e0f2fe" }}>
+                                            Add video file
+                                            <input
+                                                type="file"
+                                                accept="video/mp4,video/webm,video/quicktime,video/*"
+                                                style={{ display: "none" }}
+                                                onChange={async (e) => {
+                                                    const file = e.target.files?.[0];
+                                                    if (!file) return;
+                                                    try {
+                                                        // Reuse media upload endpoint (supports large files if backend does)
+                                                        const url = await uploadImageFile(file);
+                                                        setVideoGalleryForm((g) => [...g, url]);
+                                                    } catch (err: any) {
+                                                        setError(err?.message || "Video upload failed");
+                                                    }
+                                                    e.target.value = "";
+                                                }}
+                                            />
+                                        </label>
+                                        <input
+                                            type="text"
+                                            placeholder="Or paste video URL and press Add"
+                                            id="video-url-input"
+                                            style={{ flex: 1, minWidth: 160, padding: 10, borderRadius: 10, border: "1px solid rgba(96,165,250,0.3)", background: "rgba(0,0,0,0.35)", color: "#ecfdf5" }}
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter") {
+                                                    e.preventDefault();
+                                                    const el = e.currentTarget;
+                                                    const v = (el.value || "").trim();
+                                                    if (v) {
+                                                        setVideoGalleryForm((g) => [...g, v]);
+                                                        el.value = "";
+                                                    }
+                                                }
+                                            }}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const el = document.getElementById("video-url-input") as HTMLInputElement | null;
+                                                if (!el) return;
+                                                const v = (el.value || "").trim();
+                                                if (v) {
+                                                    setVideoGalleryForm((g) => [...g, v]);
+                                                    el.value = "";
+                                                }
+                                            }}
+                                            style={{ padding: "8px 12px", borderRadius: 10, border: "none", background: "#3b82f6", color: "#fff", fontWeight: 700, cursor: "pointer" }}
+                                        >
+                                            Add
+                                        </button>
+                                    </div>
+                                    <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                                        {videoGalleryForm.map((url, idx) => (
+                                            <div key={idx} style={{ position: "relative", width: 160, maxWidth: "100%", borderRadius: 10, overflow: "hidden", border: "1px solid rgba(96,165,250,0.35)", background: "#0f172a" }}>
+                                                <video
+                                                    src={url}
+                                                    style={{ width: "100%", height: 90, objectFit: "cover", display: "block" }}
+                                                    muted
+                                                    playsInline
+                                                    preload="metadata"
+                                                />
+                                                <div style={{ padding: "6px 8px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6 }}>
+                                                    <span style={{ fontSize: 11, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                        Video {idx + 1}
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setVideoGalleryForm((g) => g.filter((_, i) => i !== idx))}
+                                                        style={{ border: "none", borderRadius: 6, background: "rgba(239,68,68,0.25)", color: "#fca5a5", cursor: "pointer", fontSize: 11, padding: "2px 8px", fontWeight: 700 }}
+                                                    >
+                                                        Remove
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
 <div className="form-footer">
 
                                 <button
@@ -3639,6 +3731,9 @@ function AdminDashboard() {
                                             setDisasterForm(
                                                 emptyDisaster
                                             );
+                                            setExtraDetailsForm("");
+                                            setGalleryForm([]);
+                                            setVideoGalleryForm([]);
                                         }}
                                     >
                                         Cancel
