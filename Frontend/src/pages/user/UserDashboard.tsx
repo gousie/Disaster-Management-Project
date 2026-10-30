@@ -4,7 +4,7 @@ import api from "../../api/api";
 import DisasterMap from "../../components/DisasterMap";
 import AIAssist from "../../components/AIAssist";
 import ThemeToggle from "../../components/ThemeToggle";
-import { getExtras } from "../../utils/disasterExtras";
+import { getExtras, setExtras } from "../../utils/disasterExtras";
 import {
     chatStore,
     subscribeChat,
@@ -29,6 +29,137 @@ import { mergeImageOverrides, subscribeImages } from "../../utils/imageSync";
 import UserIcon from "../../components/UserIcon";
 import "./UserDashboard.css";
 
+
+/* =========================================================
+   EXTRAS SYNC (cross-device via API description marker)
+========================================================= */
+
+const EXTRAS_MARKER_START = "<!--DISASTRA_EXTRAS:";
+const EXTRAS_MARKER_END = ":DISASTRA_EXTRAS-->";
+
+function encodeExtrasIntoDescription(
+    description: string,
+    extras: { extraDetails?: string; gallery?: string[]; videos?: string[] }
+) {
+    const clean = (description || "")
+        .replace(
+            new RegExp(
+                EXTRAS_MARKER_START.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") +
+                    "[\\s\\S]*?" +
+                    EXTRAS_MARKER_END.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+                "g"
+            ),
+            ""
+        )
+        .trimEnd();
+    const payload = {
+        extraDetails: extras.extraDetails || "",
+        gallery: Array.isArray(extras.gallery) ? extras.gallery.filter(Boolean) : [],
+        videos: Array.isArray(extras.videos) ? extras.videos.filter(Boolean) : [],
+    };
+    const has =
+        (payload.extraDetails && payload.extraDetails.trim()) ||
+        payload.gallery.length > 0 ||
+        payload.videos.length > 0;
+    if (!has) return clean;
+    try {
+        const b64 =
+            typeof btoa !== "undefined"
+                ? btoa(unescape(encodeURIComponent(JSON.stringify(payload))))
+                : "";
+        if (!b64) return clean;
+        return `${clean}\n\n${EXTRAS_MARKER_START}${b64}${EXTRAS_MARKER_END}`;
+    } catch {
+        return clean;
+    }
+}
+
+function parseExtrasFromDescription(description?: string): {
+    visibleDescription: string;
+    extraDetails: string;
+    gallery: string[];
+    videos: string[];
+} {
+    const raw = description || "";
+    const start = raw.indexOf(EXTRAS_MARKER_START);
+    const end = raw.indexOf(EXTRAS_MARKER_END);
+    if (start === -1 || end === -1 || end <= start) {
+        return {
+            visibleDescription: raw,
+            extraDetails: "",
+            gallery: [],
+            videos: [],
+        };
+    }
+    const b64 = raw.slice(start + EXTRAS_MARKER_START.length, end);
+    const visibleDescription = (
+        raw.slice(0, start) + raw.slice(end + EXTRAS_MARKER_END.length)
+    ).trim();
+    try {
+        const json = decodeURIComponent(escape(atob(b64)));
+        const obj = JSON.parse(json) || {};
+        return {
+            visibleDescription,
+            extraDetails: String(obj.extraDetails || ""),
+            gallery: Array.isArray(obj.gallery)
+                ? obj.gallery.filter(Boolean).map(String)
+                : [],
+            videos: Array.isArray(obj.videos)
+                ? obj.videos.filter(Boolean).map(String)
+                : [],
+        };
+    } catch {
+        return {
+            visibleDescription: raw,
+            extraDetails: "",
+            gallery: [],
+            videos: [],
+        };
+    }
+}
+
+function resolveDisasterExtras(disaster: {
+    id?: number;
+    title?: string;
+    description?: string;
+}) {
+    const parsed = parseExtrasFromDescription(disaster.description);
+    let local: { extraDetails?: string; gallery?: string[]; videos?: string[] } =
+        { extraDetails: "", gallery: [], videos: [] };
+    try {
+        local = getExtras(disaster.id) || local;
+        if (
+            !local.extraDetails &&
+            !(local.gallery && local.gallery.length) &&
+            !(local.videos && local.videos.length)
+        ) {
+            local =
+                getExtras(
+                    `title:${(disaster.title || "").trim().toLowerCase()}`
+                ) || local;
+        }
+    } catch {
+        /* */
+    }
+    return {
+        visibleDescription: parsed.visibleDescription,
+        extraDetails: parsed.extraDetails || local.extraDetails || "",
+        gallery:
+            parsed.gallery.length > 0
+                ? parsed.gallery
+                : Array.isArray(local.gallery)
+                  ? local.gallery
+                  : [],
+        videos:
+            parsed.videos.length > 0
+                ? parsed.videos
+                : Array.isArray(local.videos)
+                  ? local.videos
+                  : [],
+    };
+}
+
+
 interface Disaster {
     id?: number;
     title: string;
@@ -40,6 +171,9 @@ interface Disaster {
     longitude?: number | null;
     status: string;
     imageUrl?: string;
+    extraDetails?: string;
+    gallery?: string[];
+    videos?: string[];
     createdAt?: string;
     updatedAt?: string;
 }
@@ -257,20 +391,20 @@ function DisasterDetailModal({
     onClose: () => void;
     getImage: (d: Disaster) => string;
 }) {
-    const extras = getExtras(disaster.id);
-    // also try title-based key if id lookup empty
-    const extrasByTitle =
-        !extras.extraDetails &&
-        !(extras.gallery && extras.gallery.length) &&
-        !(extras.videos && extras.videos.length)
-            ? getExtras(`title:${(disaster.title || "").trim().toLowerCase()}`)
-            : extras;
-    const data =
-        extras.extraDetails ||
-        (extras.gallery && extras.gallery.length) ||
-        (extras.videos && extras.videos.length)
-            ? extras
-            : extrasByTitle;
+    // 1) DB fields from API  2) description marker  3) localStorage
+    const fromApi = {
+        extraDetails: disaster.extraDetails || "",
+        gallery: Array.isArray(disaster.gallery) ? disaster.gallery : [],
+        videos: Array.isArray(disaster.videos) ? disaster.videos : [],
+    };
+    const resolved = resolveDisasterExtras(disaster);
+    const data = {
+        visibleDescription: resolved.visibleDescription,
+        extraDetails: fromApi.extraDetails || resolved.extraDetails || "",
+        gallery:
+            fromApi.gallery.length > 0 ? fromApi.gallery : resolved.gallery,
+        videos: fromApi.videos.length > 0 ? fromApi.videos : resolved.videos,
+    };
 
     const main = getImage(disaster);
     const slides = [main, ...(data.gallery || [])].filter(
@@ -328,7 +462,7 @@ function DisasterDetailModal({
                         <span>{disaster.status}</span>
                         <span>{disaster.location}</span>
                     </div>
-                    <p className="detail-desc">{disaster.description || "No description provided."}</p>
+                    <p className="detail-desc">{data.visibleDescription || "No description provided."}</p>
                     <div className="detail-extra-box">
                         <strong className="detail-extra-label">EXTRA DETAILS</strong>
                         <p className="detail-extra-text">
@@ -896,6 +1030,30 @@ function UserDashboard() {
             }));
             // merge admin image overrides so user always sees latest image
             const merged = mergeImageOverrides(data);
+
+            merged.forEach((d) => {
+                if (d.id == null) return;
+                const resolved = resolveDisasterExtras(d);
+                if (
+                    resolved.extraDetails ||
+                    (resolved.gallery && resolved.gallery.length) ||
+                    (resolved.videos && resolved.videos.length)
+                ) {
+                    try {
+                        setExtras(
+                            d.id,
+                            {
+                                extraDetails: resolved.extraDetails,
+                                gallery: resolved.gallery,
+                                videos: resolved.videos,
+                            },
+                            d.title
+                        );
+                    } catch {
+                        /* */
+                    }
+                }
+            });
 
             const activeIds = merged
                 .filter((d) => (d.status || "").toUpperCase() === "ACTIVE")
@@ -2179,7 +2337,11 @@ function UserDashboard() {
                                                     </div>
                                                     <h3>{disaster.title}</h3>
                                                     <p className="disaster-description">
-                                                        {disaster.description}
+                                                        {
+                                                            parseExtrasFromDescription(
+                                                                disaster.description
+                                                            ).visibleDescription
+                                                        }
                                                     </p>
                                                     <div className="disaster-location">
                                                         {disaster.location}
