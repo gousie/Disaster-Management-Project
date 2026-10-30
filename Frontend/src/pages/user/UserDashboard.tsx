@@ -260,11 +260,15 @@ function DisasterDetailModal({
     const extras = getExtras(disaster.id);
     // also try title-based key if id lookup empty
     const extrasByTitle =
-        !extras.extraDetails && !(extras.gallery && extras.gallery.length)
+        !extras.extraDetails &&
+        !(extras.gallery && extras.gallery.length) &&
+        !(extras.videos && extras.videos.length)
             ? getExtras(`title:${(disaster.title || "").trim().toLowerCase()}`)
             : extras;
     const data =
-        extras.extraDetails || (extras.gallery && extras.gallery.length)
+        extras.extraDetails ||
+        (extras.gallery && extras.gallery.length) ||
+        (extras.videos && extras.videos.length)
             ? extras
             : extrasByTitle;
 
@@ -274,76 +278,47 @@ function DisasterDetailModal({
     );
     const n = Math.max(slides.length, 1);
     const safeIdx = ((galleryIndex % n) + n) % n;
+    const videos = Array.isArray(data.videos) ? data.videos.filter(Boolean) : [];
 
     return (
         <div className="detail-modal-backdrop" onClick={onClose}>
             <div className="detail-modal" onClick={(e) => e.stopPropagation()}>
-                <div style={{ position: "relative", background: "#000" }}>
+                <div className="detail-hero-wrap" style={{ position: "relative", background: "#000", flexShrink: 0 }}>
                     <img
                         className="detail-hero"
                         src={slides[safeIdx] || main}
                         alt={disaster.title}
-                        style={{ minHeight: 240, width: "100%", objectFit: "cover" }}
+                        style={{
+                            minHeight: 180,
+                            maxHeight: "42vh",
+                            width: "100%",
+                            objectFit: "cover",
+                            display: "block",
+                        }}
                     />
-                    <button
-                        type="button"
-                        onClick={() => setGalleryIndex((i) => i - 1)}
-                        style={{
-                            position: "absolute",
-                            left: 12,
-                            top: "50%",
-                            transform: "translateY(-50%)",
-                            border: "none",
-                            borderRadius: 999,
-                            width: 40,
-                            height: 40,
-                            background: "rgba(16,185,129,0.85)",
-                            color: "#fff",
-                            cursor: "pointer",
-                            fontSize: 22,
-                            fontWeight: 700,
-                            zIndex: 2,
-                        }}
-                    >
-                        ‹
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setGalleryIndex((i) => i + 1)}
-                        style={{
-                            position: "absolute",
-                            right: 12,
-                            top: "50%",
-                            transform: "translateY(-50%)",
-                            border: "none",
-                            borderRadius: 999,
-                            width: 40,
-                            height: 40,
-                            background: "rgba(16,185,129,0.85)",
-                            color: "#fff",
-                            cursor: "pointer",
-                            fontSize: 22,
-                            fontWeight: 700,
-                            zIndex: 2,
-                        }}
-                    >
-                        ›
-                    </button>
-                    <div
-                        style={{
-                            position: "absolute",
-                            bottom: 12,
-                            left: 0,
-                            right: 0,
-                            textAlign: "center",
-                            color: "#fff",
-                            fontSize: 13,
-                            fontWeight: 800,
-                            textShadow: "0 2px 8px #000",
-                        }}
-                    >
-                        Photo {safeIdx + 1} / {n}
-                    </div>
+                    {n > 1 && (
+                        <>
+                            <button
+                                type="button"
+                                className="detail-nav-btn detail-nav-prev"
+                                onClick={() => setGalleryIndex((i) => i - 1)}
+                                aria-label="Previous photo"
+                            >
+                                ‹
+                            </button>
+                            <button
+                                type="button"
+                                className="detail-nav-btn detail-nav-next"
+                                onClick={() => setGalleryIndex((i) => i + 1)}
+                                aria-label="Next photo"
+                            >
+                                ›
+                            </button>
+                            <div className="detail-photo-count">
+                                Photo {safeIdx + 1} / {n}
+                            </div>
+                        </>
+                    )}
                 </div>
                 <div className="detail-modal-body">
                     <h2>{disaster.title}</h2>
@@ -353,80 +328,309 @@ function DisasterDetailModal({
                         <span>{disaster.status}</span>
                         <span>{disaster.location}</span>
                     </div>
-                    <p>{disaster.description || "No description provided."}</p>
-                    <div
-                        style={{
-                            marginTop: 12,
-                            padding: 14,
-                            borderRadius: 12,
-                            background: "rgba(16,185,129,0.1)",
-                            border: "1px solid rgba(52,211,153,0.3)",
-                        }}
-                    >
-                        <strong
-                            style={{
-                                color: "#a7f3d0",
-                                fontSize: 12,
-                                letterSpacing: "0.06em",
-                            }}
-                        >
-                            EXTRA DETAILS
-                        </strong>
-                        <p style={{ margin: "8px 0 0", whiteSpace: "pre-wrap" }}>
+                    <p className="detail-desc">{disaster.description || "No description provided."}</p>
+                    <div className="detail-extra-box">
+                        <strong className="detail-extra-label">EXTRA DETAILS</strong>
+                        <p className="detail-extra-text">
                             {data.extraDetails ||
                                 "No extra details added by admin yet."}
                         </p>
                     </div>
-                    <p>
-                        <strong>Coordinates:</strong> {disaster.latitude},{" "}
-                        {disaster.longitude}
-                    </p>
-                    <div
-                        style={{
-                            display: "flex",
-                            gap: 8,
-                            overflowX: "auto",
-                            margin: "12px 0",
-                        }}
-                    >
-                        {slides.map((s, i) => (
-                            <button
-                                key={i}
-                                type="button"
-                                onClick={() => setGalleryIndex(i)}
-                                style={{
-                                    padding: 0,
-                                    border:
-                                        i === safeIdx
-                                            ? "2px solid #34d399"
-                                            : "2px solid transparent",
-                                    borderRadius: 8,
-                                    overflow: "hidden",
-                                    cursor: "pointer",
-                                    flexShrink: 0,
-                                }}
-                            >
-                                <img
-                                    src={s}
-                                    alt=""
-                                    style={{
-                                        width: 64,
-                                        height: 48,
-                                        objectFit: "cover",
-                                        display: "block",
-                                    }}
-                                />
-                            </button>
-                        ))}
-                    </div>
+                    {(disaster.latitude != null || disaster.longitude != null) && (
+                        <p className="detail-coords">
+                            <strong>Coordinates:</strong> {disaster.latitude},{" "}
+                            {disaster.longitude}
+                        </p>
+                    )}
+                    {slides.length > 0 && (
+                        <div className="detail-thumbs">
+                            {slides.map((s, i) => (
+                                <button
+                                    key={i}
+                                    type="button"
+                                    className={`detail-thumb ${i === safeIdx ? "is-active" : ""}`}
+                                    onClick={() => setGalleryIndex(i)}
+                                >
+                                    <img src={s} alt="" loading="lazy" />
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    {videos.length > 0 && (
+                        <div className="detail-videos">
+                            <strong className="detail-extra-label">VIDEOS</strong>
+                            <div className="detail-videos-list">
+                                {videos.map((vurl, idx) => (
+                                    <div key={idx} className="detail-video-card">
+                                        <video
+                                            src={vurl}
+                                            controls
+                                            playsInline
+                                            preload="metadata"
+                                            className="detail-video-player"
+                                        />
+                                        <div className="detail-video-actions">
+                                            <span>Video {idx + 1}</span>
+                                            <a
+                                                href={vurl}
+                                                download
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="detail-download-btn"
+                                            >
+                                                Download
+                                            </a>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     <button type="button" className="detail-close" onClick={onClose}>
                         Close
                     </button>
                 </div>
             </div>
+            <style>{`
+                .detail-modal-backdrop {
+                    position: fixed;
+                    inset: 0;
+                    z-index: 9600;
+                    background: rgba(2, 12, 27, 0.72);
+                    backdrop-filter: blur(6px);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 12px;
+                    box-sizing: border-box;
+                    overflow-y: auto;
+                    -webkit-overflow-scrolling: touch;
+                }
+                .detail-modal {
+                    width: min(640px, 100%);
+                    max-height: min(92vh, 900px);
+                    display: flex;
+                    flex-direction: column;
+                    border-radius: 16px;
+                    overflow: hidden;
+                    background: linear-gradient(165deg, #0f172a 0%, #0c1a2e 100%);
+                    border: 1px solid rgba(52,211,153,0.28);
+                    box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+                    color: #e2e8f0;
+                }
+                .detail-hero-wrap { flex-shrink: 0; }
+                .detail-nav-btn {
+                    position: absolute;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    border: none;
+                    border-radius: 999px;
+                    width: 40px;
+                    height: 40px;
+                    background: rgba(16,185,129,0.85);
+                    color: #fff;
+                    cursor: pointer;
+                    font-size: 22px;
+                    font-weight: 700;
+                    z-index: 2;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    line-height: 1;
+                }
+                .detail-nav-prev { left: 10px; }
+                .detail-nav-next { right: 10px; }
+                .detail-photo-count {
+                    position: absolute;
+                    bottom: 10px;
+                    left: 0;
+                    right: 0;
+                    text-align: center;
+                    color: #fff;
+                    font-size: 12px;
+                    font-weight: 800;
+                    text-shadow: 0 2px 8px #000;
+                    pointer-events: none;
+                }
+                .detail-modal-body {
+                    padding: 16px 18px 20px;
+                    overflow-y: auto;
+                    -webkit-overflow-scrolling: touch;
+                    flex: 1 1 auto;
+                    min-height: 0;
+                }
+                .detail-modal-body h2 {
+                    margin: 0 0 8px;
+                    font-size: clamp(1.15rem, 4vw, 1.45rem);
+                    line-height: 1.25;
+                    word-break: break-word;
+                }
+                .detail-meta {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 6px;
+                    margin-bottom: 10px;
+                }
+                .detail-meta span {
+                    font-size: 11px;
+                    font-weight: 700;
+                    padding: 4px 8px;
+                    border-radius: 999px;
+                    background: rgba(255,255,255,0.08);
+                    color: #a7f3d0;
+                }
+                .detail-desc {
+                    margin: 0 0 12px;
+                    font-size: 14px;
+                    line-height: 1.5;
+                    color: #cbd5e1;
+                    word-break: break-word;
+                }
+                .detail-extra-box {
+                    margin-top: 4px;
+                    padding: 12px 14px;
+                    border-radius: 12px;
+                    background: rgba(16,185,129,0.1);
+                    border: 1px solid rgba(52,211,153,0.3);
+                }
+                .detail-extra-label {
+                    display: block;
+                    color: #a7f3d0;
+                    font-size: 11px;
+                    letter-spacing: 0.06em;
+                    margin-bottom: 6px;
+                }
+                .detail-extra-text {
+                    margin: 0;
+                    white-space: pre-wrap;
+                    font-size: 13px;
+                    line-height: 1.5;
+                    color: #e2e8f0;
+                    word-break: break-word;
+                }
+                .detail-coords {
+                    margin: 10px 0;
+                    font-size: 13px;
+                    color: #94a3b8;
+                }
+                .detail-thumbs {
+                    display: flex;
+                    gap: 8px;
+                    overflow-x: auto;
+                    margin: 12px 0;
+                    padding-bottom: 4px;
+                    -webkit-overflow-scrolling: touch;
+                }
+                .detail-thumb {
+                    padding: 0;
+                    border: 2px solid transparent;
+                    border-radius: 8px;
+                    overflow: hidden;
+                    cursor: pointer;
+                    flex-shrink: 0;
+                    background: transparent;
+                }
+                .detail-thumb.is-active {
+                    border-color: #34d399;
+                }
+                .detail-thumb img {
+                    width: 64px;
+                    height: 48px;
+                    object-fit: cover;
+                    display: block;
+                }
+                .detail-videos {
+                    margin: 16px 0 8px;
+                }
+                .detail-videos-list {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 12px;
+                    margin-top: 8px;
+                }
+                .detail-video-card {
+                    border-radius: 12px;
+                    overflow: hidden;
+                    border: 1px solid rgba(96,165,250,0.3);
+                    background: rgba(0,0,0,0.35);
+                }
+                .detail-video-player {
+                    width: 100%;
+                    max-height: 240px;
+                    display: block;
+                    background: #000;
+                }
+                .detail-video-actions {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 8px 12px;
+                    font-size: 12px;
+                    color: #94a3b8;
+                }
+                .detail-download-btn {
+                    display: inline-flex;
+                    align-items: center;
+                    padding: 6px 12px;
+                    border-radius: 8px;
+                    background: rgba(16,185,129,0.2);
+                    border: 1px solid rgba(52,211,153,0.4);
+                    color: #6ee7b7;
+                    font-weight: 700;
+                    font-size: 12px;
+                    text-decoration: none;
+                }
+                .detail-close {
+                    margin-top: 12px;
+                    width: 100%;
+                    padding: 12px;
+                    border: none;
+                    border-radius: 12px;
+                    background: linear-gradient(90deg, #14b8a6, #10b981);
+                    color: #042f2e;
+                    font-weight: 800;
+                    font-size: 14px;
+                    cursor: pointer;
+                }
+                @media (max-width: 600px) {
+                    .detail-modal-backdrop {
+                        padding: 0;
+                        align-items: stretch;
+                    }
+                    .detail-modal {
+                        width: 100%;
+                        max-height: 100%;
+                        height: 100%;
+                        border-radius: 0;
+                        border: none;
+                    }
+                    .detail-hero {
+                        max-height: 36vh !important;
+                        min-height: 160px !important;
+                    }
+                    .detail-nav-btn {
+                        width: 36px;
+                        height: 36px;
+                        font-size: 20px;
+                    }
+                    .detail-modal-body {
+                        padding: 14px 14px 24px;
+                    }
+                    .detail-video-player {
+                        max-height: 200px;
+                    }
+                    .detail-thumb img {
+                        width: 56px;
+                        height: 42px;
+                    }
+                }
+            `}</style>
         </div>
     );
 }
+
 
 
 function UserDashboard() {
