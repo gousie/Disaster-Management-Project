@@ -411,6 +411,30 @@ const emptyAlert: Alert = {
     active: true,
 };
 
+/** Download rows as CSV (Excel-friendly) */
+function downloadCsv(filename: string, rows: Record<string, unknown>[]) {
+    if (!rows.length) return;
+    const headers = Object.keys(rows[0]);
+    const esc = (v: unknown) => {
+        const s = v == null ? "" : String(v);
+        if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+        return s;
+    };
+    const lines = [
+        headers.join(","),
+        ...rows.map((r) => headers.map((h) => esc(r[h])).join(",")),
+    ];
+    const blob = new Blob(["\ufeff" + lines.join("\n")], {
+        type: "text/csv;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
 
 /* =========================================================
    ADMIN DASHBOARD
@@ -422,6 +446,12 @@ function AdminDashboard() {
 
     const [activePage, setActivePage] =
         useState("dashboard");
+
+    const [statusFilter, setStatusFilter] = useState("ALL");
+    const [severityFilter, setSeverityFilter] = useState("ALL");
+    const [typeFilter, setTypeFilter] = useState("ALL");
+    const [selectedDisasterIds, setSelectedDisasterIds] = useState<number[]>([]);
+    const [bulkBusy, setBulkBusy] = useState(false);
 
     const [disasters, setDisasters] =
         useState<Disaster[]>([]);
@@ -1401,36 +1431,151 @@ function AdminDashboard() {
 
     const filteredDisasters =
         useMemo(() => {
+            const query = search.toLowerCase().trim();
+            return disasters.filter((d) => {
+                if (
+                    statusFilter !== "ALL" &&
+                    (d.status || "").toUpperCase() !== statusFilter
+                ) {
+                    return false;
+                }
+                if (
+                    severityFilter !== "ALL" &&
+                    (d.severity || "").toUpperCase() !== severityFilter
+                ) {
+                    return false;
+                }
+                if (
+                    typeFilter !== "ALL" &&
+                    (d.type || "").toUpperCase() !== typeFilter
+                ) {
+                    return false;
+                }
+                if (!query) return true;
+                return (
+                    d.title?.toLowerCase().includes(query) ||
+                    d.type?.toLowerCase().includes(query) ||
+                    d.location?.toLowerCase().includes(query) ||
+                    d.severity?.toLowerCase().includes(query) ||
+                    d.status?.toLowerCase().includes(query)
+                );
+            });
+        }, [disasters, search, statusFilter, severityFilter, typeFilter]);
 
-            const query =
-                search
-                    .toLowerCase()
-                    .trim();
+    const pendingReports = useMemo(
+        () =>
+            disasters.filter(
+                (d) => (d.status || "").toUpperCase() === "PENDING"
+            ),
+        [disasters]
+    );
 
-            if (!query) {
-                return disasters;
+    const lowStockResources = useMemo(
+        () =>
+            resources.filter((r) => {
+                const st = (r.status || "").toUpperCase();
+                return (
+                    st === "LOW" ||
+                    st === "OUT_OF_STOCK" ||
+                    (typeof r.quantity === "number" && r.quantity <= 5)
+                );
+            }),
+        [resources]
+    );
+
+    const fundsPaidTotal = useMemo(
+        () =>
+            funds
+                .filter((f: any) => f.status === "PAID")
+                .reduce((s: number, f: any) => s + Number(f.amount || 0), 0),
+        [funds]
+    );
+
+    const exportDisastersCsv = () => {
+        downloadCsv(
+            `disastra-disasters-${new Date().toISOString().slice(0, 10)}.csv`,
+            filteredDisasters.map((d) => ({
+                id: d.id,
+                title: d.title,
+                type: d.type,
+                severity: d.severity,
+                status: d.status,
+                location: d.location,
+                latitude: d.latitude,
+                longitude: d.longitude,
+                description: d.description,
+                createdAt: d.createdAt,
+            }))
+        );
+        showMessage("Disasters CSV downloaded");
+    };
+
+    const exportFundsCsv = () => {
+        downloadCsv(
+            `disastra-funds-${new Date().toISOString().slice(0, 10)}.csv`,
+            funds.map((f: any) => ({
+                id: f.id,
+                donorName: f.donorName,
+                donorEmail: f.donorEmail,
+                donorMobile: f.donorMobile,
+                amount: f.amount,
+                status: f.status,
+                paymentId: f.razorpayPaymentId,
+                paidAt: f.paidAt,
+            }))
+        );
+        showMessage("Funds CSV downloaded");
+    };
+
+    const exportVolunteersCsv = () => {
+        downloadCsv(
+            `disastra-volunteers-${new Date().toISOString().slice(0, 10)}.csv`,
+            volunteers.map((v) => ({
+                id: v.id,
+                name: v.name,
+                mobile: v.mobile,
+                email: v.email,
+                skill: v.skill,
+                location: v.location,
+                availability: v.availability,
+                status: v.status,
+            }))
+        );
+        showMessage("Volunteers CSV downloaded");
+    };
+
+    const bulkSetStatus = async (status: string) => {
+        if (!selectedDisasterIds.length) return;
+        if (
+            !window.confirm(
+                `Set ${selectedDisasterIds.length} incident(s) to ${status}?`
+            )
+        ) {
+            return;
+        }
+        setBulkBusy(true);
+        try {
+            for (const id of selectedDisasterIds) {
+                const d = disasters.find((x) => x.id === id);
+                if (!d) continue;
+                await api.put(`/disasters/${id}`, { ...d, status });
             }
+            setSelectedDisasterIds([]);
+            await loadDisasters();
+            showMessage(`Updated ${selectedDisasterIds.length} to ${status}`);
+        } catch {
+            setError("Bulk update failed");
+        } finally {
+            setBulkBusy(false);
+        }
+    };
 
-            return disasters.filter(
-                (d) =>
-                    d.title
-                        ?.toLowerCase()
-                        .includes(query) ||
-                    d.type
-                        ?.toLowerCase()
-                        .includes(query) ||
-                    d.location
-                        ?.toLowerCase()
-                        .includes(query) ||
-                    d.severity
-                        ?.toLowerCase()
-                        .includes(query)
-            );
-
-        }, [
-            disasters,
-            search,
-        ]);
+    const toggleSelectDisaster = (id?: number) => {
+        if (id == null) return;
+        setSelectedDisasterIds((prev) =>
+            prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+        );
+    };
 
 
     /* =====================================================
@@ -1624,6 +1769,22 @@ function AdminDashboard() {
                         <b>
                             {activeDisasters.length}
                         </b>
+                    </button>
+
+                    <button
+                        className={
+                            activePage === "approvals" ? "active" : ""
+                        }
+                        onClick={() => goTo("approvals")}
+                        title="Pending user reports"
+                    >
+                        <Icon name="notification" />
+                        <span>Approvals</span>
+                        {pendingReports.length > 0 && (
+                            <b style={{ background: "#ef4444", color: "#fff" }}>
+                                {pendingReports.length}
+                            </b>
+                        )}
                     </button>
 
 
@@ -2528,6 +2689,118 @@ function AdminDashboard() {
 
                         </div>
 
+                        {/* Advanced filters + export + bulk */}
+                        <div
+                            style={{
+                                display: "flex",
+                                flexWrap: "wrap",
+                                gap: 10,
+                                marginBottom: 16,
+                                alignItems: "center",
+                            }}
+                        >
+                            <select
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
+                                style={{
+                                    padding: "8px 12px",
+                                    borderRadius: 10,
+                                    border: "1px solid rgba(148,163,184,0.35)",
+                                    background: "rgba(15,23,42,0.8)",
+                                    color: "#e2e8f0",
+                                }}
+                            >
+                                <option value="ALL">All statuses</option>
+                                <option value="ACTIVE">Active</option>
+                                <option value="PENDING">Pending</option>
+                                <option value="RESOLVED">Resolved</option>
+                                <option value="CLOSED">Closed</option>
+                                <option value="REJECTED">Rejected</option>
+                            </select>
+                            <select
+                                value={severityFilter}
+                                onChange={(e) => setSeverityFilter(e.target.value)}
+                                style={{
+                                    padding: "8px 12px",
+                                    borderRadius: 10,
+                                    border: "1px solid rgba(148,163,184,0.35)",
+                                    background: "rgba(15,23,42,0.8)",
+                                    color: "#e2e8f0",
+                                }}
+                            >
+                                <option value="ALL">All severities</option>
+                                <option value="CRITICAL">Critical</option>
+                                <option value="HIGH">High</option>
+                                <option value="MEDIUM">Medium</option>
+                                <option value="LOW">Low</option>
+                            </select>
+                            <select
+                                value={typeFilter}
+                                onChange={(e) => setTypeFilter(e.target.value)}
+                                style={{
+                                    padding: "8px 12px",
+                                    borderRadius: 10,
+                                    border: "1px solid rgba(148,163,184,0.35)",
+                                    background: "rgba(15,23,42,0.8)",
+                                    color: "#e2e8f0",
+                                }}
+                            >
+                                <option value="ALL">All types</option>
+                                <option value="FLOOD">Flood</option>
+                                <option value="CYCLONE">Cyclone</option>
+                                <option value="EARTHQUAKE">Earthquake</option>
+                                <option value="LANDSLIDE">Landslide</option>
+                                <option value="FIRE">Fire</option>
+                                <option value="DROUGHT">Drought</option>
+                                <option value="OTHER">Other</option>
+                            </select>
+                            <button
+                                type="button"
+                                className="outline-button"
+                                onClick={exportDisastersCsv}
+                                style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                            >
+                                <Icon name="download" size={16} />
+                                Export CSV
+                            </button>
+                            {selectedDisasterIds.length > 0 && (
+                                <>
+                                    <span style={{ color: "#94a3b8", fontSize: 13 }}>
+                                        {selectedDisasterIds.length} selected
+                                    </span>
+                                    <button
+                                        type="button"
+                                        className="primary-button"
+                                        disabled={bulkBusy}
+                                        onClick={() => bulkSetStatus("ACTIVE")}
+                                    >
+                                        Bulk Active
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="outline-button"
+                                        disabled={bulkBusy}
+                                        onClick={() => bulkSetStatus("RESOLVED")}
+                                    >
+                                        Bulk Resolve
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelectedDisasterIds([])}
+                                        style={{
+                                            border: "none",
+                                            background: "transparent",
+                                            color: "#94a3b8",
+                                            cursor: "pointer",
+                                        }}
+                                    >
+                                        Clear
+                                    </button>
+                                </>
+                            )}
+                        </div>
+
+                        {lowStockResources.length > 0 && activePage === "disasters" && null}
 
                         <div className="disaster-grid">
 
@@ -2563,7 +2836,50 @@ function AdminDashboard() {
                                             key={
                                                 disaster.id
                                             }
+                                            style={{
+                                                outline:
+                                                    disaster.id != null &&
+                                                    selectedDisasterIds.includes(
+                                                        disaster.id
+                                                    )
+                                                        ? "2px solid #34d399"
+                                                        : undefined,
+                                            }}
                                         >
+                                            <label
+                                                style={{
+                                                    position: "absolute",
+                                                    zIndex: 5,
+                                                    top: 10,
+                                                    left: 10,
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    gap: 6,
+                                                    background: "rgba(0,0,0,0.55)",
+                                                    padding: "4px 8px",
+                                                    borderRadius: 8,
+                                                    cursor: "pointer",
+                                                    fontSize: 11,
+                                                    color: "#fff",
+                                                    fontWeight: 700,
+                                                }}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={
+                                                        disaster.id != null &&
+                                                        selectedDisasterIds.includes(
+                                                            disaster.id
+                                                        )
+                                                    }
+                                                    onChange={() =>
+                                                        toggleSelectDisaster(
+                                                            disaster.id
+                                                        )
+                                                    }
+                                                />
+                                                Select
+                                            </label>
 
                                             <div className="disaster-image-wrap">
 
@@ -4574,23 +4890,93 @@ function AdminDashboard() {
                                 <h2>Funds Received</h2>
                                 <p>View all payments made by users via Razorpay.</p>
                             </div>
-                            <button
-                                className="primary-button"
-                                onClick={async () => {
-                                    try {
-                                        setFundsLoading(true);
-                                        const res = await api.get("/funds");
-                                        setFunds(Array.isArray(res.data) ? res.data : []);
-                                    } catch (e) {
-                                        console.error(e);
-                                    } finally {
-                                        setFundsLoading(false);
-                                    }
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                                <button
+                                    type="button"
+                                    className="outline-button"
+                                    onClick={exportFundsCsv}
+                                    disabled={!funds.length}
+                                >
+                                    <Icon name="download" size={16} /> Export CSV
+                                </button>
+                                <button
+                                    className="primary-button"
+                                    onClick={async () => {
+                                        try {
+                                            setFundsLoading(true);
+                                            const res = await api.get("/funds");
+                                            setFunds(Array.isArray(res.data) ? res.data : []);
+                                        } catch (e) {
+                                            console.error(e);
+                                        } finally {
+                                            setFundsLoading(false);
+                                        }
+                                    }}
+                                >
+                                    <Icon name="refresh" size={16} />
+                                    Refresh
+                                </button>
+                            </div>
+                        </div>
+
+                        <div
+                            style={{
+                                display: "grid",
+                                gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                                gap: 12,
+                                marginBottom: 16,
+                            }}
+                        >
+                            <div
+                                style={{
+                                    padding: 14,
+                                    borderRadius: 14,
+                                    background: "rgba(16,185,129,0.12)",
+                                    border: "1px solid rgba(52,211,153,0.3)",
                                 }}
                             >
-                                <Icon name="refresh" size={16} />
-                                Refresh
-                            </button>
+                                <small style={{ color: "#94a3b8" }}>Total PAID</small>
+                                <strong style={{ display: "block", fontSize: 20, color: "#6ee7b7" }}>
+                                    ₹{fundsPaidTotal.toFixed(2)}
+                                </strong>
+                            </div>
+                            <div
+                                style={{
+                                    padding: 14,
+                                    borderRadius: 14,
+                                    background: "rgba(59,130,246,0.12)",
+                                    border: "1px solid rgba(96,165,250,0.3)",
+                                }}
+                            >
+                                <small style={{ color: "#94a3b8" }}>Transactions</small>
+                                <strong style={{ display: "block", fontSize: 20 }}>{funds.length}</strong>
+                            </div>
+                            <div
+                                style={{
+                                    padding: 14,
+                                    borderRadius: 14,
+                                    background: "rgba(251,191,36,0.1)",
+                                    border: "1px solid rgba(251,191,36,0.3)",
+                                }}
+                            >
+                                <small style={{ color: "#94a3b8" }}>Pending reports</small>
+                                <strong style={{ display: "block", fontSize: 20, color: "#fbbf24" }}>
+                                    {pendingReports.length}
+                                </strong>
+                            </div>
+                            <div
+                                style={{
+                                    padding: 14,
+                                    borderRadius: 14,
+                                    background: "rgba(239,68,68,0.1)",
+                                    border: "1px solid rgba(248,113,113,0.3)",
+                                }}
+                            >
+                                <small style={{ color: "#94a3b8" }}>Low stock resources</small>
+                                <strong style={{ display: "block", fontSize: 20, color: "#fca5a5" }}>
+                                    {lowStockResources.length}
+                                </strong>
+                            </div>
                         </div>
 
                         {fundsLoading ? (
