@@ -7058,3 +7058,111 @@ html[data-theme="violet"] .theme-cyber.user-dashboard,
 html.violet .theme-cyber.user-dashboard {
     /* variables above already applied via .user-dashboard */
 }
+
+/* =========================================================
+   MOBILE FIX — YouTube embeds + disaster detail extras/videos
+   (appended for phone layout)
+========================================================= */
+
+.videos-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+    width: 100%;
+}
+
+.video-card {
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.video-embed {
+    position: relative !important;
+    width: 100% !important;
+    height: 0 !important;
+    padding-top: 56.25% !important;
+    padding-bottom: 0 !important;
+    background: #0a1628 !important;
+    overflow: hidden !important;
+}
+
+.video-embed iframe {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    border: 0 !important;
+    display: block !important;
+}
+
+.user-dashboard .videos-grid {
+    display: grid !important;
+}
+
+@media (max-width: 640px) {
+    .videos-grid {
+        grid-template-columns: 1fr !important;
+    }
+    .video-embed {
+        padding-top: 56.25% !important;
+        min-height: 0 !important;
+    }
+}
+
+.user-dashboard .detail-modal,
+.detail-modal {
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+}
+
+.user-dashboard .detail-modal-body,
+.detail-modal-body {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+}
+
+.user-dashboard .detail-extra-box,
+.user-dashboard .detail-videos,
+.detail-extra-box,
+.detail-videos {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+@media (max-width: 600px) {
+    .user-dashboard .detail-modal,
+    .detail-modal {
+        width: 100% !important;
+        height: 100% !important;
+        height: 100dvh !important;
+        max-height: 100% !important;
+        border-radius: 0 !important;
+    }
+
+    .user-dashboard .detail-modal-body,
+    .detail-modal-body {
+        padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)) !important;
+    }
+
+    .detail-video-player {
+        width: 100% !important;
+        min-height: 180px !important;
+        max-height: none !important;
+    }
+
+    .user-dashboard .user-main {
+        overflow-x: hidden;
+        overflow-y: visible !important;
+    }
+
+    .user-section#videos,
+    .user-section#disasters {
+        overflow: visible !important;
+    }
+}
